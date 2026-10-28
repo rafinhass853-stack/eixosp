@@ -7,26 +7,19 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
 
-    match /multas/{id} {
-      allow read, create, update: if owner();
+    // A conta proprietária pode importar e consultar coleções de primeiro nível.
+    // Exclusões ficam bloqueadas para preservar dados e histórico.
+    match /{collectionName}/{id} {
+      allow read, create, update: if owner() && collectionName != 'auditoria_multas';
       allow delete: if false;
     }
-    match /condutores/{id} {
-      allow read, create, update: if owner();
-      allow delete: if false;
-    }
-    match /veiculos/{id} {
-      allow read, create, update: if owner();
-      allow delete: if false;
-    }
-    match /funcionarios/{id} {
-      allow read, create, update: if owner();
-      allow delete: if false;
-    }
+
+    // Auditoria não pode ser editada nem apagada.
     match /auditoria_multas/{id} {
       allow read, create: if owner();
       allow update, delete: if false;
     }
+
     match /{document=**} {
       allow read, write: if false;
     }
