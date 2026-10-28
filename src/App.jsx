@@ -5,7 +5,7 @@ import {
   LayoutDashboard, CarFront, ClipboardList, Upload, Menu, Sun, Moon,
   PanelLeftClose, PanelLeftOpen, Wifi, WifiOff, RefreshCw, Users,
   UserRound, Fuel, Radio, FileWarning, GitCompare, Target, Gauge,
-  ChartNoAxesCombined, BriefcaseBusiness, Network, FileSpreadsheet
+  BarChart3, BriefcaseBusiness, Network, FileSpreadsheet
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Multas from './pages/Multas';
@@ -25,7 +25,7 @@ const nav=[
   {id:'gestaoCadastros',label:'Gestão Cadastros',icon:GitCompare},
   {id:'metas',label:'Minhas metas',icon:Target},
   {id:'calculosFrota',label:'Cálculos Frota',icon:Gauge},
-  {id:'chartData',label:'Chart Data',icon:ChartNoAxesCombined},
+  {id:'chartData',label:'Chart Data',icon:BarChart3},
   {id:'dadosBIMultas',label:'Dados BI Multas',icon:FileSpreadsheet},
   {id:'dadosAdministrativos',label:'Dados Administrativos',icon:BriefcaseBusiness},
   {id:'hierarquia',label:'Hierarquia Dados',icon:Network},
