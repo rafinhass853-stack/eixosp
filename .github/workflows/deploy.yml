@@ -13,6 +13,10 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EIXOSPGESTAOFROTAS }}
+          project_id: eixospgestaofrotas
       - run: npx firebase-tools deploy --only firestore:rules --project eixospgestaofrotas
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
