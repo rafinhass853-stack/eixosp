@@ -8,11 +8,11 @@ const collectionFor=name=>{
   const known={
     condutores:'condutores',
     veiculos:'veiculos',
-    infracoes:'multas',
-    multas:'multas',
+    infracoes:'infracoes',
+    multas:'infracoes',
     funcionarios:'funcionarios',
-    ticktlog:'cadastros_ticket_log',
-    ticketlog:'cadastros_ticket_log',
+    ticktlog:'cadastros_ticktlog',
+    ticketlog:'cadastros_ticktlog',
     ibutton:'ibutton_cobli',
     cobli:'ibutton_cobli',
     gestaomanual:'gestao_manual_infracoes',
@@ -31,9 +31,9 @@ const identityFor=(sheet,row)=>{
   const entries=Object.entries(row);
   const find=terms=>{const pair=entries.find(([k,v])=>terms.some(t=>normalize(k).replace(/[^a-z0-9]/g,'').includes(t))&&String(v??'').trim());return pair?String(pair[1]).trim():''};
   const tab=normalize(sheet);
-  if(tab.includes('veicul'))return find(['placa'])||find(['id'])||find(['numerofrota']);
-  if(tab.includes('infrac')||tab.includes('multa'))return find(['ait','autodeinfracao'])||[find(['placa']),find(['datahora']),find(['infracao'])].filter(Boolean).join('|');
-  if(tab.includes('condutor'))return find(['matricula'])||find(['cpf'])||find(['id'])||find(['nome']);
+  if(tab.includes('veicul'))return find(['id'])||find(['placa'])||find(['numerofrota']);
+  if(tab.includes('infrac')||tab.includes('multa'))return find(['id'])||find(['ait','autodeinfracao'])||[find(['placa']),find(['datahora']),find(['infracao'])].filter(Boolean).join('|');
+  if(tab.includes('condutor'))return find(['id'])||find(['matricula'])||find(['cpf'])||find(['nome']);
   if(tab.includes('funcion'))return find(['matricula'])||find(['cpf'])||find(['id'])||find(['nome']);
   return find(['id'])||find(['codigo'])||find(['matricula'])||find(['placa'])||find(['ait'])||find(['nome'])||'';
 };
