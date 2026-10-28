@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
+import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
-import { db } from './services/firebase';
+import { db, auth, googleProvider } from './services/firebase';
 import {
   LayoutDashboard, CarFront, ClipboardList, Upload, Menu, Sun, Moon,
   PanelLeftClose, PanelLeftOpen, Wifi, WifiOff, RefreshCw, Users,
@@ -82,14 +83,17 @@ function mapRow(r,kind){
   return o;
 }
 export default function App(){
-  const [page,setPage]=useState('dashboard'),[vehicles,setVehicles]=useState([]),[fines,setFines]=useState([]),[connected,setConnected]=useState(false),[error,setError]=useState(''),[dark,setDark]=useState(true),[collapsed,setCollapsed]=useState(false),[mobileNav,setMobileNav]=useState(false);
+  const [page,setPage]=useState('dashboard'),[vehicles,setVehicles]=useState([]),[fines,setFines]=useState([]),[connected,setConnected]=useState(false),[error,setError]=useState(''),[authUser,setAuthUser]=useState(null),[authReady,setAuthReady]=useState(false),[signingIn,setSigningIn]=useState(false),[dark,setDark]=useState(true),[collapsed,setCollapsed]=useState(false),[mobileNav,setMobileNav]=useState(false);
+  useEffect(()=>onAuthStateChanged(auth,user=>{setAuthUser(user);setAuthReady(true);if(!user){setConnected(false);setError('Conecte-se com a conta Google autorizada para acessar o Firestore.')}else if(user.email?.toLowerCase()!=='rafinhass853@gmail.com'){setError('Use a conta autorizada rafinhass853@gmail.com.');signOut(auth).catch(()=>{});}}),[]);
+  const connectGoogle=async()=>{setSigningIn(true);setError('');try{const result=await signInWithPopup(auth,googleProvider);if(result.user?.email?.toLowerCase()!=='rafinhass853@gmail.com'){await signOut(auth);throw new Error('Use a conta autorizada rafinhass853@gmail.com.')}}catch(e){setError(e.message||'Não foi possível conectar com o Google.');}finally{setSigningIn(false)}};
   useEffect(()=>{
+    if(!authReady||!authUser||authUser.email?.toLowerCase()!=='rafinhass853@gmail.com')return;
     let ready=0;const done=()=>{ready++;if(ready>=2)setConnected(true)};
     const fail=e=>{setError(e.message||'Falha de conexão com o Firestore.');setConnected(false)};
     const a=onSnapshot(collection(db,'veiculos'),s=>{setVehicles(s.docs.map(d=>({id:d.id,...d.data()})));done()},fail);
     const b=onSnapshot(collection(db,'multas'),s=>{setFines(s.docs.map(d=>({id:d.id,...d.data()})));done()},fail);
     return()=>{a();b()};
-  },[]);
+  },[authReady,authUser]);
   const saveVehicle=async(data,id)=>{
     const placa=norm(data.placa).toUpperCase();
     if(!placa)throw new Error('Informe a placa do veículo.');
@@ -178,7 +182,7 @@ export default function App(){
     <main className="main-area">
       <header className="topbar"><div className="topbar-left"><button className="icon-button desktop-only" onClick={()=>setCollapsed(v=>!v)} title="Recolher menu">{collapsed?<PanelLeftOpen size={19}/>:<PanelLeftClose size={19}/>}</button><button className="icon-button mobile-only" onClick={()=>setMobileNav(v=>!v)}><Menu size={20}/></button><div className="breadcrumbs">Operações <span>/</span> <b>{title}</b></div></div><div className="topbar-right"><span className={'connection-label '+(connected?'connected':'')}>{connected?'Ao vivo':'Offline / conectando'}</span><button className="icon-button" onClick={()=>setDark(v=>!v)} title={dark?'Usar tema claro':'Usar tema escuro'}>{dark?<Sun size={18}/>:<Moon size={18}/>}</button><div className="avatar">SP</div></div></header>
       <div className="content">
-        {error&&<div className="error-banner"><WifiOff size={18}/><div><strong>Não foi possível carregar os dados do Firestore.</strong><p>{error} Verifique a conectividade e as regras de segurança do projeto Firebase.</p></div><button className="icon-button" onClick={()=>location.reload()}><RefreshCw size={16}/></button></div>}
+        {error&&<div className="error-banner"><WifiOff size={18}/><div><strong>{authUser?'Não foi possível carregar os dados do Firestore.':'Acesso protegido do Firestore'}</strong><p>{error}</p>{!authUser&&<button className="button button-primary" disabled={!authReady||signingIn} onClick={connectGoogle}>{signingIn?'Conectando...':'Conectar com Google'}</button>}</div><button className="icon-button" onClick={()=>location.reload()} title="Tentar novamente"><RefreshCw size={16}/></button></div>}
         {page==='dashboard'?<Dashboard vehicles={vehicles} fines={fines} onNavigate={navigate}/>:page==='frota'?<Frota vehicles={vehicles} onSave={saveVehicle}/>:page==='multas'?<Multas fines={fines} onSave={saveFine} onDelete={id=>deleteDoc(doc(db,'multas',id))}/>:page==='importar'?<Importar onImport={importRows}/>:isGeneric?<PlanilhaModulo moduleKey={moduleKeys[page]} onNavigate={navigate}/>:null}
       </div>
       <footer className="app-footer"><span>© {new Date().getFullYear()} Eixo SP · Gestão operacional</span><span><i className={connected?'online':''}/>{connected?'Sincronização ativa':'Aguardando Firestore'}</span></footer>
