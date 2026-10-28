@@ -18,7 +18,7 @@ const descriptions = {
   hierarquia: ['Hierarquia de dados', 'Estrutura organizacional e níveis hierárquicos para análise e validação de responsáveis.'],
 };
 
-// Nomes oficiais das seis coleções do PPCM no Firestore.
+// Coleções oficiais existentes no Firestore do PPCM.
 const collectionByModule = {
   condutores: 'condutores',
   funcionarios: 'funcionarios',
@@ -29,7 +29,7 @@ const collectionByModule = {
   dadosAdministrativos: 'funcionarios',
   dadosBIMultas: 'infracoes',
   chartData: 'infracoes',
-  hierarquia: 'funcionarios',
+  hierarquia: 'hierarquia_dados',
 };
 
 const displayValue = value => {
