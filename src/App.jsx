@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from './services/firebase';
 import {
   LayoutDashboard, CarFront, ClipboardList, Upload, Menu, Sun, Moon,
@@ -33,6 +33,39 @@ const nav=[
 ];
 const moduleKeys={condutores:'condutores',funcionarios:'funcionarios',ticktlog:'ticktlog',ibutton:'ibutton',gestaoManual:'gestaoManual',gestaoCadastros:'gestaoCadastros',metas:'metas',calculosFrota:'calculosFrota',chartData:'chartData',dadosBIMultas:'dadosBIMultas',dadosAdministrativos:'dadosAdministrativos',hierarquia:'hierarquia'};
 const norm=s=>String(s??'').trim();
+const normalized=s=>String(s??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+const rowKey=(sheet,row)=>{
+  const tab=normalized(sheet), entries=Object.entries(row);
+  const pick=(terms)=>{const p=entries.find(([k,v])=>terms.some(t=>normalized(k).includes(t))&&String(v??'').trim()!=='');return p?String(p[1]).trim():''};
+  let key='';
+  if(tab.includes('veicul'))key=pick(['placa'])||pick(['id'])||pick(['numerofrota']);
+  else if(tab.includes('infrac')||tab.includes('multa'))key=pick(['ait','autodeinfracao'])||[pick(['placa']),pick(['datahora','datainfracao']),pick(['infracao'])].filter(Boolean).join('|');
+  else if(tab.includes('condutor'))key=pick(['matricula'])||pick(['cpf'])||pick(['id'])||pick(['nome']);
+  else if(tab.includes('funcion'))key=pick(['matricula'])||pick(['cpf'])||pick(['id'])||pick(['nome']);
+  else key=pick(['id'])||pick(['codigo'])||pick(['matricula'])||pick(['placa'])||pick(['ait'])||pick(['nome']);
+  if(!key)key=JSON.stringify(row);
+  return normalized(key);
+};
+const canonicalFields=(sheet,row)=>{
+  const data={...row},tab=normalized(sheet);
+  for(const [k,v] of Object.entries(row)){
+    const key=normalized(k),value=typeof v==='string'?v.trim():v;
+    if(key==='placa')data.placa=String(value??'').toUpperCase();
+    if(['norfrota','numerofrota','prefixo'].includes(key))data.prefixo=value;
+    if(['ait','autodeinfracao','numerodoait'].includes(key))data.ait=value;
+    if(['datahorainfracao','datainfracao'].includes(key))data.dataInfracao=value;
+    if(['prazoacompanhamento','prazo'].includes(key))data.prazo=value;
+    if(['valor','valorr'].includes(key))data.valor=value;
+    if(key==='pontos')data.pontos=value;
+    if(['statusproximaacao','status'].includes(key))data.status=value;
+    if(['nome','nomecompleto'].includes(key)&&tab.includes('condutor'))data.nome=value;
+    if(['matricula','matriculaempregado'].includes(key))data.matricula=value;
+    if(key==='cpf')data.cpf=value;
+    if(key==='modelo')data.modelo=value;
+    if(key==='marca')data.marca=value;
+  }
+  return data;
+};
 function mapRow(r,kind){
   const o={};
   for(const [k,v] of Object.entries(r)){
@@ -71,23 +104,66 @@ export default function App(){
     const payload={...data,placa:norm(data.placa).toUpperCase(),valor:Number(data.valor||0),pontos:Number(data.pontos||0),updatedAt:serverTimestamp()};
     if(id)await updateDoc(doc(db,'multas',id),payload);else await addDoc(collection(db,'multas'),{...payload,createdAt:serverTimestamp()});
   };
-  const importRows=async(kind,rows)=>{
-    let added=0,updated=0,skipped=0;
-    for(const row of rows){
-      const data=mapRow(row,kind);
-      if(kind==='frota'){
-        const placa=norm(data.placa).toUpperCase();if(!placa){skipped++;continue}
-        const old=vehicles.find(v=>norm(v.placa).toUpperCase()===placa);
-        if(old){const safe={...data};delete safe.id;await updateDoc(doc(db,'veiculos',old.id),{...safe,updatedAt:serverTimestamp()});updated++}
-        else{await addDoc(collection(db,'veiculos'),{...data,placa,createdAt:serverTimestamp()});added++}
-      }else{
-        const ait=norm(data.ait);if(!ait){skipped++;continue}
-        const old=fines.find(f=>norm(f.ait)===ait);
-        if(old){const safe={...data};for(const k of Object.keys(safe))if(safe[k]===''||safe[k]===null||safe[k]===undefined)delete safe[k];await updateDoc(doc(db,'multas',old.id),{...safe,updatedAt:serverTimestamp()});updated++}
-        else{await addDoc(collection(db,'multas'),{...data,createdAt:serverTimestamp()});added++}
+  const importRows=async(sheets,onProgress=()=>{})=>{
+    let added=0,skipped=0,invalid=0;
+    const loaded=new Map(),seenInFile=new Map();
+    const resolveCollection=sheet=>{
+      const n=normalized(sheet.name);
+      if(n.includes('condutor'))return 'condutores';
+      if(n.includes('veicul')||n==='frota')return 'veiculos';
+      if(n.includes('infrac')||n.includes('multa'))return 'multas';
+      if(n.includes('funcion'))return 'funcionarios';
+      if(n.includes('ticketlog')||n.includes('ticktlog'))return 'cadastros_ticket_log';
+      if(n.includes('ibutton')||n.includes('cobli'))return 'ibutton_cobli';
+      return sheet.collection||n.replace(/[^a-z0-9]+/g,'_')||'importacao_planilha';
+    };
+    const identifyExisting=(sheetName,data)=>{
+      const tab=normalized(sheetName);
+      if(tab.includes('veicul'))return normalized(data.placa||data.Placa||data.id||data.ID||data.prefixo||data['Nº Frota']);
+      if(tab.includes('infrac')||tab.includes('multa'))return normalized(data.ait||data.AIT||data['Auto de Infração'])||normalized([data.placa||data.Placa,data.dataInfracao||data['Data/Hora Infração'],data.infracao||data.Infração].filter(Boolean).join('|'));
+      if(tab.includes('condutor'))return normalized(data.matricula||data['Matrícula']||data.cpf||data.CPF||data.id||data.ID||data.nome||data.Nome);
+      if(tab.includes('funcion'))return normalized(data.matricula||data['Matrícula']||data.cpf||data.CPF||data.id||data.ID||data.nome||data.Nome);
+      return normalized(data.id||data.ID||data.codigo||data.Código||data.matricula||data['Matrícula']||data.placa||data.Placa||data.ait||data.AIT||data.nome||data.Nome)||normalized(JSON.stringify(data));
+    };
+    try{
+      for(let i=0;i<sheets.length;i++){
+        const sheet=sheets[i],collectionName=resolveCollection(sheet);
+        onProgress('Conferindo coleção '+collectionName+' ('+(i+1)+'/'+sheets.length+')...');
+        if(!loaded.has(collectionName)){
+          const snap=await getDocs(collection(db,collectionName));
+          loaded.set(collectionName,snap.docs.map(d=>({id:d.id,...d.data()})));
+          seenInFile.set(collectionName,new Set(loaded.get(collectionName).map(d=>identifyExisting(sheet.name,d)).filter(Boolean)));
+        }
       }
+      for(let i=0;i<sheets.length;i++){
+        const sheet=sheets[i],collectionName=resolveCollection(sheet);
+        const seen=seenInFile.get(collectionName)||new Set();
+        let batch=writeBatch(db),inBatch=0;
+        for(let idx=0;idx<sheet.rows.length;idx++){
+          const row=sheet.rows[idx];
+          if(!row||!Object.values(row).some(v=>String(v??'').trim()!=='')){invalid++;continue}
+          const key=rowKey(sheet.name,row);
+          if(!key){invalid++;continue}
+          const matchKey=identifyExisting(sheet.name,row);
+          if(matchKey&&seen.has(matchKey)){skipped++;continue}
+          const data=canonicalFields(sheet.name,row);
+          data._importacao={arquivo:'Gestãototal.xlsx',aba:sheet.name,chave:key,importadoEm:new Date().toISOString()};
+          const ref=doc(collection(db,collectionName));
+          batch.set(ref,data);
+          inBatch++;added++;
+          if(matchKey)seen.add(matchKey);
+          if(inBatch>=400){await batch.commit();batch=writeBatch(db);inBatch=0;onProgress('Gravando '+collectionName+' · '+(idx+1)+' de '+sheet.rows.length+' linhas...');}
+        }
+        if(inBatch)await batch.commit();
+        seenInFile.set(collectionName,seen);
+        loaded.set(collectionName,loaded.get(collectionName)||[]);
+        onProgress('Aba '+sheet.name+' processada.');
+      }
+      return{added,skipped,invalid};
+    }catch(e){
+      e.message='A gravação parou após '+added+' novo(s) registro(s). '+(e.message||'Falha no Firestore')+' Reimporte o arquivo: os registros já gravados serão reconhecidos e ignorados.';
+      throw e;
     }
-    return{added,updated,skipped};
   };
   const title=nav.find(n=>n.id===page)?.label||'Painel';
   const navigate=id=>{setPage(id);setMobileNav(false)};
