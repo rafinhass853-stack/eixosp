@@ -1,1 +1,1 @@
-export default { content: ['./index.html', './src/**/*.{js,jsx}'], theme: { extend: { colors: { eixo: { ink:'#071321', panel:'#0D1D2E', line:'#20364B', blue:'#2F8FE5', gold:'#FFD700', teal:'#22C7B8' } } } }, plugins: [] }
+export default {content:['./index.html','./src/**/*.{js,jsx}'],theme:{extend:{}},plugins:[]};
