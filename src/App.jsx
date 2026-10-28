@@ -165,15 +165,15 @@ export default function App(){
           data._importacao={arquivo:'Gestãototal.xlsx',aba:sheet.name,chave:key,importadoEm:new Date().toISOString()};
           let ref;
           if(['veiculos','condutores','infracoes'].includes(collectionName)){
-            const sourceId=documentId(valueByNormalizedKey(row,['id'])||(collectionName==='veiculos'?valueByNormalizedKey(row,['placa']):collectionName==='infracoes'?valueByNormalizedKey(row,['Nº Auto Infração (AIT)','AIT','Auto de Infração']):''));
-            if(sourceId){
-              const alreadyHasDocument=loaded.get(collectionName).some(item=>item.id===sourceId);
-              if(alreadyHasDocument){skipped++;if(matchKey)seen.add(matchKey);continue;}
-              ref=doc(db,collectionName,sourceId);
-              data.id=valueByNormalizedKey(row,['id'])||sourceId;
-            }
+            const sourceId=documentId(valueByNormalizedKey(row,['id'])||(collectionName==='veiculos'?valueByNormalizedKey(row,['placa']):''));
+            if(!sourceId){invalid++;continue;}
+            const alreadyHasDocument=loaded.get(collectionName).some(item=>item.id===sourceId);
+            if(alreadyHasDocument){skipped++;if(matchKey)seen.add(matchKey);continue;}
+            ref=doc(db,collectionName,sourceId);
+            data.id=valueByNormalizedKey(row,['id'])||sourceId;
+          }else{
+            ref=doc(collection(db,collectionName));
           }
-          if(!ref)ref=doc(collection(db,collectionName));
           batch.set(ref,data);
           inBatch++;added++;
           if(matchKey)seen.add(matchKey);
