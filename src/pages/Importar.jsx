@@ -5,6 +5,12 @@ import * as XLSX from 'xlsx';
 const normalize=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
 const collectionFor=name=>{
   const n=normalize(name).replace(/[^a-z0-9]+/g,'');
+  if(n.includes('condutor'))return 'condutores';
+  if(n.includes('veicul')||n==='frota')return 'veiculos';
+  if(n.includes('infrac')||n.includes('multa'))return 'infracoes';
+  if(n.includes('funcion'))return 'funcionarios';
+  if(n.includes('ticktlog')||n.includes('ticketlog'))return 'cadastros_ticktlog';
+  if(n.includes('ibutton')||n.includes('cobli'))return 'ibutton_cobli';
   const known={
     condutores:'condutores',
     veiculos:'veiculos',
