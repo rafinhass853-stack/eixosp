@@ -39,7 +39,7 @@ const valueByNormalizedKey=(data,keys)=>{
   const entry=Object.entries(data||{}).find(([key,value])=>wanted.has(normalized(key))&&value!==undefined&&value!==null&&String(value).trim()!=='');
   return entry?.[1]??'';
 };
-const documentId=value=>String(value??'').trim().replace(/\\//g,'-').slice(0,1500);
+const documentId=value=>String(value??'').trim().replace(/\//g,'-').slice(0,1500);
 const vehicleView=(data,id)=>({...data,id,placa:String(valueByNormalizedKey(data,['placa'])||'').toUpperCase(),prefixo:valueByNormalizedKey(data,['Nº Frota','No Frota','prefixo']),modelo:valueByNormalizedKey(data,['modelo completo','modelo']),marca:valueByNormalizedKey(data,['marca']),ano:valueByNormalizedKey(data,['ano modelo','ano fabricação','ano']),hodometro:valueByNormalizedKey(data,['hodometro']),propriedade:valueByNormalizedKey(data,['propriedade']),status:valueByNormalizedKey(data,['status veículo','status'])});
 const fineView=(data,id)=>({...data,id,ait:valueByNormalizedKey(data,['ait','Nº Auto Infração (AIT)','Auto de Infração']),placa:String(valueByNormalizedKey(data,['placa'])||'').toUpperCase(),dataInfracao:valueByNormalizedKey(data,['data infração','data/hora infração','dataInfracao']),prazo:valueByNormalizedKey(data,['data limite apresentar condutor','prazo acompanhamento','prazo']),condutor:valueByNormalizedKey(data,['condutor']),valor:valueByNormalizedKey(data,['valor total','valor com desconto','valor']),pontos:valueByNormalizedKey(data,['pontos cnh','pontos']),infracao:valueByNormalizedKey(data,['descrição infração','infração']),status:valueByNormalizedKey(data,['etapa fluxo','status / próxima ação','status'])});
 const normalized=s=>String(s??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
