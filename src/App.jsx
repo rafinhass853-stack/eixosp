@@ -146,7 +146,7 @@ export default function App(){
         onProgress('Conferindo coleção '+collectionName+' ('+(i+1)+'/'+sheets.length+')...');
         if(!loaded.has(collectionName)){
           const snap=await getDocs(collection(db,collectionName));
-          loaded.set(collectionName,snap.docs.map(d=>({id:d.id,...d.data()})));
+          loaded.set(collectionName,snap.docs.map(d=>({...d.data(),id:d.id})));
           seenInFile.set(collectionName,new Set(loaded.get(collectionName).map(d=>identifyExisting(sheet.name,d)).filter(Boolean)));
         }
       }
