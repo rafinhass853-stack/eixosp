@@ -15,13 +15,14 @@ const collectionFor=name=>{
     ticketlog:'cadastros_ticket_log',
     ibutton:'ibutton_cobli',
     cobli:'ibutton_cobli',
-    gestaoManual:'gestao_manual_infracoes',
-    gestaoCadastros:'gestao_cadastros',
+    gestaomanual:'gestao_manual_infracoes',
+    gestaocadastros:'gestao_cadastros',
+    minhasmetas:'metas',
     metas:'metas',
-    calculosFrota:'calculos_frota',
-    chartData:'chart_data',
-    dadosBIMultas:'dados_bi_multas',
-    dadosAdministrativos:'dados_administrativos',
+    calculosfrota:'calculos_frota',
+    chartdata:'chart_data',
+    dadosbimultas:'dados_bi_multas',
+    dadosadministrativos:'dados_administrativos',
     hierarquia:'hierarquia_dados'
   };
   return known[n]||n.replace(/[^a-z0-9]+/g,'_')||'importacao_planilha';
