@@ -1,6 +1,6 @@
 import {useEffect,useState} from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, writeBatch, setDoc } from 'firebase/firestore';
 import { db, auth, googleProvider } from './services/firebase';
 import {
   LayoutDashboard, CarFront, ClipboardList, Upload, Menu, Sun, Moon,
@@ -34,6 +34,14 @@ const nav=[
 ];
 const moduleKeys={condutores:'condutores',funcionarios:'funcionarios',ticktlog:'ticktlog',ibutton:'ibutton',gestaoManual:'gestaoManual',gestaoCadastros:'gestaoCadastros',metas:'metas',calculosFrota:'calculosFrota',chartData:'chartData',dadosBIMultas:'dadosBIMultas',dadosAdministrativos:'dadosAdministrativos',hierarquia:'hierarquia'};
 const norm=s=>String(s??'').trim();
+const valueByNormalizedKey=(data,keys)=>{
+  const wanted=new Set(keys.map(normalized));
+  const entry=Object.entries(data||{}).find(([key,value])=>wanted.has(normalized(key))&&value!==undefined&&value!==null&&String(value).trim()!=='');
+  return entry?.[1]??'';
+};
+const documentId=value=>String(value??'').trim().replace(/\\//g,'-').slice(0,1500);
+const vehicleView=(data,id)=>({...data,id,placa:String(valueByNormalizedKey(data,['placa'])||'').toUpperCase(),prefixo:valueByNormalizedKey(data,['Nº Frota','No Frota','prefixo']),modelo:valueByNormalizedKey(data,['modelo completo','modelo']),marca:valueByNormalizedKey(data,['marca']),ano:valueByNormalizedKey(data,['ano modelo','ano fabricação','ano']),hodometro:valueByNormalizedKey(data,['hodometro']),propriedade:valueByNormalizedKey(data,['propriedade']),status:valueByNormalizedKey(data,['status veículo','status'])});
+const fineView=(data,id)=>({...data,id,ait:valueByNormalizedKey(data,['ait','Nº Auto Infração (AIT)','Auto de Infração']),placa:String(valueByNormalizedKey(data,['placa'])||'').toUpperCase(),dataInfracao:valueByNormalizedKey(data,['data infração','data/hora infração','dataInfracao']),prazo:valueByNormalizedKey(data,['data limite apresentar condutor','prazo acompanhamento','prazo']),condutor:valueByNormalizedKey(data,['condutor']),valor:valueByNormalizedKey(data,['valor total','valor com desconto','valor']),pontos:valueByNormalizedKey(data,['pontos cnh','pontos']),infracao:valueByNormalizedKey(data,['descrição infração','infração']),status:valueByNormalizedKey(data,['etapa fluxo','status / próxima ação','status'])});
 const normalized=s=>String(s??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
 const rowKey=(sheet,row)=>{
   const tab=normalized(sheet), entries=Object.entries(row);
@@ -90,8 +98,8 @@ export default function App(){
     if(!authReady||!authUser||authUser.email?.toLowerCase()!=='rafinhass853@gmail.com')return;
     let ready=0;const done=()=>{ready++;if(ready>=2)setConnected(true)};
     const fail=e=>{setError(e.message||'Falha de conexão com o Firestore.');setConnected(false)};
-    const a=onSnapshot(collection(db,'veiculos'),s=>{setVehicles(s.docs.map(d=>({id:d.id,...d.data()})));done()},fail);
-    const b=onSnapshot(collection(db,'multas'),s=>{setFines(s.docs.map(d=>({id:d.id,...d.data()})));done()},fail);
+    const a=onSnapshot(collection(db,'veiculos'),s=>{setVehicles(s.docs.map(d=>vehicleView(d.data(),d.id)));done()},fail);
+    const b=onSnapshot(collection(db,'infracoes'),s=>{setFines(s.docs.map(d=>fineView(d.data(),d.id)));done()},fail);
     return()=>{a();b()};
   },[authReady,authUser]);
   const saveVehicle=async(data,id)=>{
@@ -99,14 +107,16 @@ export default function App(){
     if(!placa)throw new Error('Informe a placa do veículo.');
     const duplicate=vehicles.find(v=>v.placa?.toUpperCase()===placa&&v.id!==id);
     if(duplicate)throw new Error('Já existe veículo com esta placa.');
-    const payload={...data,placa,updatedAt:serverTimestamp()};
-    if(id)await updateDoc(doc(db,'veiculos',id),payload);else await addDoc(collection(db,'veiculos'),{...payload,createdAt:serverTimestamp()});
+    const payload={...data,placa,Placa:placa,updatedAt:serverTimestamp()};
+    if(id)await updateDoc(doc(db,'veiculos',id),payload);else{const sourceId=documentId(data.id||placa);if(!sourceId)throw new Error('Informe o ID ou a placa para identificar o veículo.');await setDoc(doc(db,'veiculos',sourceId),{...payload,id:data.id??sourceId,createdAt:serverTimestamp()});}
   };
   const saveFine=async(data,id)=>{
     const ait=norm(data.ait);
     if(ait){const duplicate=fines.find(f=>norm(f.ait)===ait&&f.id!==id);if(duplicate)throw new Error('Já existe multa com este AIT.');}
-    const payload={...data,placa:norm(data.placa).toUpperCase(),valor:Number(data.valor||0),pontos:Number(data.pontos||0),updatedAt:serverTimestamp()};
-    if(id)await updateDoc(doc(db,'multas',id),payload);else await addDoc(collection(db,'multas'),{...payload,createdAt:serverTimestamp()});
+    const aitId=documentId(data.id||ait);
+    const plate=norm(data.placa).toUpperCase();
+    const payload={...data,placa:plate,Placa:plate,valor:Number(data.valor||0),pontos:Number(data.pontos||0),updatedAt:serverTimestamp()};
+    if(id)await updateDoc(doc(db,'infracoes',id),payload);else if(aitId)await setDoc(doc(db,'infracoes',aitId),{...payload,id:data.id??aitId,createdAt:serverTimestamp()});else await addDoc(collection(db,'infracoes'),{...payload,createdAt:serverTimestamp()});
   };
   const importRows=async(sheets,onProgress=()=>{})=>{
     let added=0,skipped=0,invalid=0;
@@ -115,19 +125,20 @@ export default function App(){
       const n=normalized(sheet.name);
       if(n.includes('condutor'))return 'condutores';
       if(n.includes('veicul')||n==='frota')return 'veiculos';
-      if(n.includes('infrac')||n.includes('multa'))return 'multas';
+      if(n.includes('infrac')||n.includes('multa'))return 'infracoes';
       if(n.includes('funcion'))return 'funcionarios';
-      if(n.includes('ticketlog')||n.includes('ticktlog'))return 'cadastros_ticket_log';
+      if(n.includes('ticketlog')||n.includes('ticktlog'))return 'cadastros_ticktlog';
       if(n.includes('ibutton')||n.includes('cobli'))return 'ibutton_cobli';
       return sheet.collection||n.replace(/[^a-z0-9]+/g,'_')||'importacao_planilha';
     };
     const identifyExisting=(sheetName,data)=>{
       const tab=normalized(sheetName);
-      if(tab.includes('veicul'))return normalized(data.placa||data.Placa||data.id||data.ID||data.prefixo||data['Nº Frota']);
-      if(tab.includes('infrac')||tab.includes('multa'))return normalized(data.ait||data.AIT||data['Auto de Infração'])||normalized([data.placa||data.Placa,data.dataInfracao||data['Data/Hora Infração'],data.infracao||data.Infração].filter(Boolean).join('|'));
-      if(tab.includes('condutor'))return normalized(data.matricula||data['Matrícula']||data.cpf||data.CPF||data.id||data.ID||data.nome||data.Nome);
-      if(tab.includes('funcion'))return normalized(data.matricula||data['Matrícula']||data.cpf||data.CPF||data.id||data.ID||data.nome||data.Nome);
-      return normalized(data.id||data.ID||data.codigo||data.Código||data.matricula||data['Matrícula']||data.placa||data.Placa||data.ait||data.AIT||data.nome||data.Nome)||normalized(JSON.stringify(data));
+      const get=(...keys)=>valueByNormalizedKey(data,keys);
+      if(tab.includes('veicul'))return normalized(get('Placa','id','Nº Frota','prefixo'));
+      if(tab.includes('infrac')||tab.includes('multa'))return normalized(get('id','Nº Auto Infração (AIT)','AIT','Auto de Infração'))||normalized([get('Placa'),get('Data Infração','Data/Hora Infração'),get('Descrição Infração','Infração')].filter(Boolean).join('|'));
+      if(tab.includes('condutor'))return normalized(get('id','Matrícula','CPF','Nome'));
+      if(tab.includes('funcion'))return normalized(get('Matricula','Matrícula','CPF','Nome'));
+      return normalized(get('id','codigo','matricula','placa','ait','nome'))||normalized(JSON.stringify(data));
     };
     try{
       for(let i=0;i<sheets.length;i++){
@@ -152,7 +163,17 @@ export default function App(){
           if(matchKey&&seen.has(matchKey)){skipped++;continue}
           const data=canonicalFields(sheet.name,row);
           data._importacao={arquivo:'Gestãototal.xlsx',aba:sheet.name,chave:key,importadoEm:new Date().toISOString()};
-          const ref=doc(collection(db,collectionName));
+          let ref;
+          if(['veiculos','condutores','infracoes'].includes(collectionName)){
+            const sourceId=documentId(valueByNormalizedKey(row,['id'])||(collectionName==='veiculos'?valueByNormalizedKey(row,['placa']):collectionName==='infracoes'?valueByNormalizedKey(row,['Nº Auto Infração (AIT)','AIT','Auto de Infração']):''));
+            if(sourceId){
+              const alreadyHasDocument=loaded.get(collectionName).some(item=>item.id===sourceId);
+              if(alreadyHasDocument){skipped++;if(matchKey)seen.add(matchKey);continue;}
+              ref=doc(db,collectionName,sourceId);
+              data.id=valueByNormalizedKey(row,['id'])||sourceId;
+            }
+          }
+          if(!ref)ref=doc(collection(db,collectionName));
           batch.set(ref,data);
           inBatch++;added++;
           if(matchKey)seen.add(matchKey);
@@ -183,7 +204,7 @@ export default function App(){
       <header className="topbar"><div className="topbar-left"><button className="icon-button desktop-only" onClick={()=>setCollapsed(v=>!v)} title="Recolher menu">{collapsed?<PanelLeftOpen size={19}/>:<PanelLeftClose size={19}/>}</button><button className="icon-button mobile-only" onClick={()=>setMobileNav(v=>!v)}><Menu size={20}/></button><div className="breadcrumbs">Operações <span>/</span> <b>{title}</b></div></div><div className="topbar-right"><span className={'connection-label '+(connected?'connected':'')}>{connected?'Ao vivo':'Offline / conectando'}</span><button className="icon-button" onClick={()=>setDark(v=>!v)} title={dark?'Usar tema claro':'Usar tema escuro'}>{dark?<Sun size={18}/>:<Moon size={18}/>}</button><div className="avatar">SP</div></div></header>
       <div className="content">
         {error&&<div className="error-banner"><WifiOff size={18}/><div><strong>{authUser?'Não foi possível carregar os dados do Firestore.':'Acesso protegido do Firestore'}</strong><p>{error}</p>{!authUser&&<button className="button button-primary" disabled={!authReady||signingIn} onClick={connectGoogle}>{signingIn?'Conectando...':'Conectar com Google'}</button>}</div><button className="icon-button" onClick={()=>location.reload()} title="Tentar novamente"><RefreshCw size={16}/></button></div>}
-        {page==='dashboard'?<Dashboard vehicles={vehicles} fines={fines} onNavigate={navigate}/>:page==='frota'?<Frota vehicles={vehicles} onSave={saveVehicle}/>:page==='multas'?<Multas fines={fines} onSave={saveFine} onDelete={id=>deleteDoc(doc(db,'multas',id))}/>:page==='importar'?<Importar onImport={importRows}/>:isGeneric?<PlanilhaModulo moduleKey={moduleKeys[page]} onNavigate={navigate}/>:null}
+        {page==='dashboard'?<Dashboard vehicles={vehicles} fines={fines} onNavigate={navigate}/>:page==='frota'?<Frota vehicles={vehicles} onSave={saveVehicle}/>:page==='multas'?<Multas fines={fines} onSave={saveFine} onDelete={id=>deleteDoc(doc(db,'infracoes',id))}/>:page==='importar'?<Importar onImport={importRows}/>:isGeneric?<PlanilhaModulo moduleKey={moduleKeys[page]} onNavigate={navigate}/>:null}
       </div>
       <footer className="app-footer"><span>© {new Date().getFullYear()} Eixo SP · Gestão operacional</span><span><i className={connected?'online':''}/>{connected?'Sincronização ativa':'Aguardando Firestore'}</span></footer>
     </main>
