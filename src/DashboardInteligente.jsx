@@ -49,7 +49,8 @@ function summarize(rows, key) {
     const date = new Date(value);
     return !Number.isNaN(date.getTime()) && date < hoje && !/(conclu|encerrad|finalizad|arquivad)/.test(status);
   }).length;
-  const rh = rows.filter((row) => norm(first(row, ['Etapa atual'])) === norm('Enviado ao RH')).length;\n  return { total, ativos, inativos, cnh, incompletos, abertas, vencidas, rh };
+  const rh = rows.filter((row) => norm(first(row, ['Etapa atual'])) === norm('Enviado ao RH')).length;
+  return { total, ativos, inativos, cnh, incompletos, abertas, vencidas, rh };
 }
 
 export default function DashboardInteligente({ modulo }) {
@@ -75,7 +76,8 @@ export default function DashboardInteligente({ modulo }) {
     cnh: 'Validade identificada como vencida',
     incompletos: 'Registros com campos-chave ausentes',
     abertas: 'Processos sem status de conclusão reconhecido',
-    vencidas: 'Prazo legal vencido e ainda em acompanhamento',\n    rh: 'Etapa final do PPCM concluída',
+    vencidas: 'Prazo legal vencido e ainda em acompanhamento',
+    rh: 'Etapa final do PPCM concluída',
     atencao: 'Registros com status de atenção',
   };
   const valueFor = (id) => id === 'atencao' ? rows.filter((r) => /(oficina|manutenc|bloquead|inativo|pendente)/.test(norm(first(r, ['Status', 'Status Veículo', 'Situação'])))).length : stats[id];
