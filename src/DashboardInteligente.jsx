@@ -8,7 +8,7 @@ const MODULOS = {
   funcionarios: { collection: 'funcionarios', title: 'Visão de funcionários', description: 'Resumo do cadastro e da qualidade das informações.', icon: '🧑‍💼', metrics: [['Total cadastrado', 'total'], ['Ativos', 'ativos'], ['Inativos', 'inativos'], ['Dados incompletos', 'incompletos']] },
   ticketlog: { collection: 'ticketlog', title: 'Painel Ticket Log', description: 'Acompanhe os registros e os principais pontos de conferência.', icon: '🎫', metrics: [['Registros', 'total'], ['Ativos', 'ativos'], ['CNH a verificar', 'cnh'], ['Dados incompletos', 'incompletos']] },
   cobli: { collection: 'cobli', title: 'Painel Cobli', description: 'Visão geral dos registros vinculados à operação Cobli.', icon: '📡', metrics: [['Registros', 'total'], ['Ativos', 'ativos'], ['CNH a verificar', 'cnh'], ['Dados incompletos', 'incompletos']] },
-  multas: { collection: 'multas', title: 'Painel de multas', description: 'Priorize processos em aberto, prazos e registros que precisam de revisão.', icon: '🚨', metrics: [['Total de registros', 'total'], ['Em aberto', 'abertas'], ['Prazo vencido', 'vencidas'], ['Dados incompletos', 'incompletos']] },
+  multas: { collection: 'multas', title: 'Painel de multas', description: 'Priorize processos em aberto, prazos e registros que precisam de revisão.', icon: '🚨', metrics: [['Infrações cadastradas', 'total'], ['Em acompanhamento', 'abertas'], ['Prazo legal vencido', 'vencidas'], ['Enviadas ao RH', 'rh']] },
 };
 const norm = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 const first = (row, keys) => keys.map((key) => row[key]).find((value) => value !== undefined && value !== null && String(value).trim() !== '');
@@ -42,14 +42,14 @@ function summarize(rows, key) {
     return s && !/(conclu|encerrad|finalizad|arquivad|cancelad)/.test(s);
   }).length;
   const vencidas = rows.filter((row) => {
-    const status = norm(first(row, ['Status do Processo', 'Status / Próxima ação', 'Prioridade']));
+    const status = norm(first(row, ['Etapa atual', 'Status do Processo', 'Status / Próxima ação', 'Prioridade']));
     if (status.includes('vencid')) return true;
-    const value = first(row, ['Prazo Limite Legal de Indicação', 'Prazo Acompanhamento', 'prazo']);
+    const value = first(row, ['Prazo legal para indicação', 'Prazo Limite Legal de Indicação', 'Prazo Acompanhamento', 'prazo']);
     if (!value) return false;
     const date = new Date(value);
     return !Number.isNaN(date.getTime()) && date < hoje && !/(conclu|encerrad|finalizad|arquivad)/.test(status);
   }).length;
-  return { total, ativos, inativos, cnh, incompletos, abertas, vencidas };
+  const rh = rows.filter((row) => norm(first(row, ['Etapa atual'])) === norm('Enviado ao RH')).length;\n  return { total, ativos, inativos, cnh, incompletos, abertas, vencidas, rh };
 }
 
 export default function DashboardInteligente({ modulo }) {
@@ -75,7 +75,7 @@ export default function DashboardInteligente({ modulo }) {
     cnh: 'Validade identificada como vencida',
     incompletos: 'Registros com campos-chave ausentes',
     abertas: 'Processos sem status de conclusão reconhecido',
-    vencidas: 'Prazo vencido identificado nos dados',
+    vencidas: 'Prazo legal vencido e ainda em acompanhamento',\n    rh: 'Etapa final do PPCM concluída',
     atencao: 'Registros com status de atenção',
   };
   const valueFor = (id) => id === 'atencao' ? rows.filter((r) => /(oficina|manutenc|bloquead|inativo|pendente)/.test(norm(first(r, ['Status', 'Status Veículo', 'Situação'])))).length : stats[id];
@@ -99,7 +99,7 @@ export default function DashboardInteligente({ modulo }) {
           </article>
         ))}
       </div>
-      <div className="smart-insight"><span className="smart-insight-icon">✦</span><div><strong>{loading ? 'Analisando os dados…' : error ? 'Indicadores indisponíveis' : modulo === 'multas' ? (stats.vencidas ? 'Atenção aos prazos' : 'Acompanhe os prazos regularmente') : stats.incompletos ? 'Oportunidade de melhorar a qualidade cadastral' : 'Base pronta para acompanhamento'}</strong><p>{loading ? 'Os indicadores serão exibidos após a leitura do Firestore.' : error ? 'Os números não foram estimados nem substituídos por dados fictícios.' : modulo === 'multas' ? (stats.vencidas ? stats.vencidas + ' registro(s) aparentam estar com prazo vencido. Confira cada processo antes de agir.' : 'Não foram identificados prazos vencidos pelos campos reconhecidos. Confira se os prazos estão preenchidos.') : stats.incompletos ? stats.incompletos + ' registro(s) podem ter campos-chave ausentes. Use a busca do módulo para revisar os cadastros.' : 'Os números são calculados a partir dos documentos disponíveis nesta coleção.'}</p></div></div>
+      <div className="smart-insight"><span className="smart-insight-icon">✦</span><div><strong>{loading ? 'Analisando os dados…' : error ? 'Indicadores indisponíveis' : modulo === 'multas' ? (stats.vencidas ? 'Atenção aos prazos' : 'Acompanhe os processos até o RH') : stats.incompletos ? 'Oportunidade de melhorar a qualidade cadastral' : 'Base pronta para acompanhamento'}</strong><p>{loading ? 'Os indicadores serão exibidos após a leitura do Firestore.' : error ? 'Os números não foram estimados nem substituídos por dados fictícios.' : modulo === 'multas' ? (stats.vencidas ? stats.vencidas + ' processo(s) em acompanhamento aparentam estar com prazo legal vencido. Confira cada processo antes de agir.' : 'O indicador considera processos ainda não enviados ao RH e o campo de prazo legal. O fluxo do PPCM termina no envio ao RH.') : stats.incompletos ? stats.incompletos + ' registro(s) podem ter campos-chave ausentes. Use a busca do módulo para revisar os cadastros.' : 'Os números são calculados a partir dos documentos disponíveis nesta coleção.'}</p></div></div>
     </section>
   );
 }
