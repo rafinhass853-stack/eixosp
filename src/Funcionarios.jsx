@@ -1,5 +1,6 @@
 // src/Funcionarios.jsx
 import React, { useMemo, useRef, useState } from "react";
+import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
 
 /**
@@ -120,7 +121,7 @@ const vazio = () =>
   CAMPOS_FUNCIONARIO.reduce((acc, c) => ({ ...acc, [c]: "" }), {});
 
 export default function Funcionarios() {
-  const [funcionarios, setFuncionarios] = useState([]);
+  const [funcionarios, setFuncionarios, removeFuncionario] = useFirestoreCollection("funcionarios", (f) => f["Matricula"] || f["CPF"] || f["Nome"]);
   const [form, setForm] = useState(vazio());
   const [editIndex, setEditIndex] = useState(null);
   const [aba, setAba] = useState("lista"); // lista | form | importar
@@ -173,9 +174,9 @@ export default function Funcionarios() {
     setAba("form");
   }
 
-  function excluir(i) {
+  async function excluir(i) {
     if (!confirm("Excluir este funcionário?")) return;
-    setFuncionarios((v) => v.filter((_, idx) => idx !== i));
+    await removeFuncionario(funcionarios[i]);
   }
 
   function novo() {

@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
+import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
 
 /**
@@ -220,7 +221,7 @@ const vazio = () =>
   CAMPOS_VEICULO.reduce((acc, c) => ({ ...acc, [c]: "" }), {});
 
 export default function Veiculos() {
-  const [veiculos, setVeiculos] = useState([]);
+  const [veiculos, setVeiculos, removeVeiculo] = useFirestoreCollection("veiculos", (v) => v.id || v["Placa"] || v["Nº Frota"]);
   const [form, setForm] = useState(vazio());
   const [editIndex, setEditIndex] = useState(null);
   const [aba, setAba] = useState("lista"); // lista | form | importar
@@ -266,9 +267,9 @@ export default function Veiculos() {
     setAba("form");
   }
 
-  function excluir(i) {
+  async function excluir(i) {
     if (!confirm("Excluir este veículo?")) return;
-    setVeiculos((v) => v.filter((_, idx) => idx !== i));
+    await removeVeiculo(veiculos[i]);
   }
 
   function novo() {

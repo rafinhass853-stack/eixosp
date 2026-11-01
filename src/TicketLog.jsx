@@ -1,5 +1,6 @@
 // src/TicketLog.jsx
 import React, { useMemo, useRef, useState } from "react";
+import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
 
 /**
@@ -23,7 +24,7 @@ const vazio = () =>
   CAMPOS_TICKETLOG.reduce((acc, c) => ({ ...acc, [c]: "" }), {});
 
 export default function TicketLog() {
-  const [registros, setRegistros] = useState([]);
+  const [registros, setRegistros, removeRegistro] = useFirestoreCollection("ticketlog", (r) => r["Matrícula"] || r["Nome"]);
   const [form, setForm] = useState(vazio());
   const [editIndex, setEditIndex] = useState(null);
   const [aba, setAba] = useState("lista"); // lista | form | importar
@@ -77,9 +78,9 @@ export default function TicketLog() {
     setAba("form");
   }
 
-  function excluir(i) {
+  async function excluir(i) {
     if (!confirm("Excluir este registro?")) return;
-    setRegistros((v) => v.filter((_, idx) => idx !== i));
+    await removeRegistro(registros[i]);
   }
 
   function novo() {
