@@ -26,3 +26,39 @@
 @media(max-width:1100px){.app-sidebar{width:245px}.app-main{margin-left:245px}.workspace{padding:27px 24px 16px}.topbar{padding:0 24px}.nav-label small{font-size:9px}}
 @media(max-width:760px){.app-sidebar{width:min(290px,86vw);transform:translateX(-105%);transition:transform .24s ease;box-shadow:12px 0 40px #062c3030}.app-sidebar.is-open{transform:translateX(0)}.sidebar-scrim{position:fixed;inset:0;z-index:35;background:#082f35a3;border:0;backdrop-filter:blur(2px)}.app-main{margin-left:0}.topbar{height:62px;padding:0 15px}.mobile-menu-button{display:inline-flex;align-items:center;justify-content:center;margin-right:11px}.topbar-left{min-width:0}.breadcrumbs{gap:7px}.topbar-date,.topbar-divider,.profile-chip>span:last-child{display:none}.topbar-right{gap:8px}.profile-avatar{width:32px;height:32px}.workspace{padding:24px 14px 14px}.page-heading{margin-bottom:19px}.page-heading h1{font-size:27px}.page-heading p{max-width:280px;line-height:1.6}.heading-mark{width:47px;height:47px;border-radius:14px;font-size:21px}.eyebrow{font-size:8px;letter-spacing:1px}.workspace-footer{flex-direction:column;gap:8px}.module-content .overflow-auto{max-width:100%}.module-content table{min-width:720px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+
+/* Dashboards operacionais por módulo */
+.smart-dashboard{margin:0 0 22px;padding:22px;border:1px solid #e0eae9;border-radius:20px;background:linear-gradient(135deg,#ffffff 0%,#f8fcfb 68%,#eff8f5 100%);box-shadow:0 10px 35px #173f4808}
+.smart-dashboard-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
+.smart-heading-copy{min-width:0}.smart-eyebrow{display:inline-flex;align-items:center;gap:7px;color:#07847c;font-size:9px;font-weight:800;letter-spacing:1.5px}
+.smart-eyebrow:before{content:"";width:16px;height:2px;background:#b5d334;border-radius:2px}
+.smart-heading-copy h2{margin:7px 0 5px;font-family:Manrope,sans-serif;font-size:20px;letter-spacing:-.6px;color:#18383f}
+.smart-heading-copy p{margin:0;color:#71828a;font-size:11px;line-height:1.6}
+.smart-refresh{display:inline-flex;align-items:center;gap:7px;flex-shrink:0;padding:9px 12px;border:1px solid #dce9e6;border-radius:10px;background:#fff;color:#087f78;font-size:11px;font-weight:700}
+.smart-refresh:hover{background:#edf8f5;border-color:#b9ddd6}
+.smart-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.smart-metric{min-width:0;padding:15px 15px 14px;border:1px solid #e6eeed;border-radius:14px;background:#fff;box-shadow:0 5px 16px #193e4705}
+.smart-metric-top{display:flex;align-items:center;justify-content:space-between;gap:7px;color:#647b80;font-size:11px;font-weight:600}
+.smart-metric-icon{display:grid;place-items:center;width:28px;height:28px;flex-shrink:0;border-radius:9px;background:#e8f6f2;color:#087f78;font-size:15px}
+.smart-metric strong{display:block;margin:12px 0 5px;font-family:Manrope,sans-serif;font-size:28px;line-height:1.1;letter-spacing:-1px;color:#173c42}
+.smart-metric small{display:block;min-height:28px;color:#8a9a9e;font-size:10px;line-height:1.45}
+.smart-metric.metric-1 .smart-metric-icon{background:#e5f5eb;color:#17835f}
+.smart-metric.metric-2 .smart-metric-icon{background:#fff2df;color:#a76b12}
+.smart-metric.metric-3 .smart-metric-icon{background:#f2eaff;color:#7d4bb5}
+.smart-insight{display:flex;align-items:flex-start;gap:11px;margin-top:13px;padding:13px 14px;border:1px solid #e5eeeb;border-radius:12px;background:#f7fbf9}
+.smart-insight-icon{display:grid;place-items:center;flex:0 0 28px;height:28px;border-radius:9px;background:#e5f4ee;color:#07847c}
+.smart-insight strong{display:block;margin:1px 0 4px;color:#28494b;font-size:11px}
+.smart-insight p{margin:0;color:#74878a;font-size:10px;line-height:1.6}
+.smart-notice{margin:-3px 0 13px;padding:11px 13px;border-radius:10px;background:#fff4e5;color:#875a1b;font-size:11px;line-height:1.5}
+/* Superfícies mais leves e listas com aparência de cartões */
+.module-content .bg-white{border-radius:14px}
+.module-content .shadow-sm{box-shadow:0 6px 22px #183e4907}
+.module-content .overflow-x-auto,.module-content .overflow-auto{border-radius:13px}
+.module-content table tbody tr{background:#fff}
+.module-content table tbody tr:hover{background:#f4faf8}
+.module-content table td,.module-content table th{padding-top:12px;padding-bottom:12px}
+.module-content .rounded-lg,.module-content .rounded-md{border-radius:10px}
+.module-content button{border-radius:9px}
+@media(max-width:1000px){.smart-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.smart-dashboard{padding:18px}}
+@media(max-width:520px){.smart-dashboard{padding:15px;border-radius:15px}.smart-dashboard-heading{gap:8px}.smart-heading-copy h2{font-size:18px}.smart-heading-copy p{font-size:10px}.smart-refresh{padding:8px}.smart-refresh span{display:none}.smart-metrics{gap:8px}.smart-metric{padding:12px}.smart-metric strong{font-size:24px}.smart-metric small{font-size:9px}.smart-metric-top{font-size:10px}}
