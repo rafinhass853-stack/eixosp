@@ -5,14 +5,15 @@ import Funcionarios from './Funcionarios';
 import TicketLog from './TicketLog';
 import Cobli from './Cobli';
 import Multas from './Multas';
+import DashboardInteligente from './DashboardInteligente';
 
 const MENU = [
-  { key: 'condutores', label: 'Condutores', desc: 'Cadastro e habilitações', icon: '👤', componente: <Condutores />, group: 'Cadastros' },
-  { key: 'veiculos', label: 'Veículos', desc: 'Frota e informações operacionais', icon: '🚘', componente: <Veiculos />, group: 'Cadastros' },
-  { key: 'funcionarios', label: 'Funcionários', desc: 'Pessoas e estrutura', icon: '🧑‍💼', componente: <Funcionarios />, group: 'Cadastros' },
-  { key: 'ticketlog', label: 'Ticket Log', desc: 'Cadastros e controle', icon: '🎫', componente: <TicketLog />, group: 'Operação' },
-  { key: 'cobli', label: 'Cobli', desc: 'Rastreamento e integração', icon: '📡', componente: <Cobli />, group: 'Operação' },
-  { key: 'multas', label: 'Multas', desc: 'Infrações e acompanhamento', icon: '🚨', componente: <Multas />, group: 'Operação' },
+  { key: 'condutores', label: 'Condutores', desc: 'Cadastro, habilitações e qualidade dos dados', icon: '👤', componente: <Condutores />, group: 'Cadastros' },
+  { key: 'veiculos', label: 'Veículos', desc: 'Frota, disponibilidade e dados operacionais', icon: '🚘', componente: <Veiculos />, group: 'Cadastros' },
+  { key: 'funcionarios', label: 'Funcionários', desc: 'Pessoas, vínculos e estrutura', icon: '🧑‍💼', componente: <Funcionarios />, group: 'Cadastros' },
+  { key: 'ticketlog', label: 'Ticket Log', desc: 'Cadastros e pontos de conferência', icon: '🎫', componente: <TicketLog />, group: 'Operação' },
+  { key: 'cobli', label: 'Cobli', desc: 'Registros e informações operacionais', icon: '📡', componente: <Cobli />, group: 'Operação' },
+  { key: 'multas', label: 'Multas', desc: 'Infrações, prazos e acompanhamento', icon: '🚨', componente: <Multas />, group: 'Operação' },
 ];
 
 export default function Menu() {
@@ -53,18 +54,18 @@ export default function Menu() {
           {grupos.length === 0 && <p className="nav-empty">Nenhum módulo encontrado.</p>}
         </nav>
         <div className="sidebar-bottom">
-          <div className="support-card"><span className="support-icon">✦</span><div><strong>Central de operação</strong><p>Seus dados, organizados em um só lugar.</p></div></div>
-          <div className="sidebar-foot"><span className="mini-brand">EIXO<span>SP</span></span><span>Gestão integrada <b>•</b> v1.1</span></div>
+          <div className="support-card"><span className="support-icon">✦</span><div><strong>Central de operação</strong><p>Indicadores, cadastros e rotinas em um só lugar.</p></div></div>
+          <div className="sidebar-foot"><span className="mini-brand">EIXO<span>SP</span></span><span>Gestão integrada <b>•</b> v1.2</span></div>
         </div>
       </aside>
-
       <section className="app-main">
         <header className="topbar">
           <div className="topbar-left"><button className="mobile-menu-button" onClick={() => setMenuAberto(true)} aria-label="Abrir menu">☰</button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-divider">/</span><strong>{itemAtual.label}</strong></div></div>
           <div className="topbar-right"><span className="topbar-date">{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date())}</span><span className="topbar-divider" /><div className="profile-chip"><span className="profile-avatar">ES</span><span><strong>Operações</strong><small>Gestão de frota</small></span></div></div>
         </header>
         <main className="workspace">
-          <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> EIXO SP <span className="eyebrow-dot">/</span> CONTROLE OPERACIONAL</div><h1>{itemAtual.label}</h1><p>{itemAtual.desc}. Acompanhe informações e rotinas da operação.</p></div><div className="heading-mark" aria-hidden="true"><span>{itemAtual.icon}</span></div></div>
+          <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> EIXO SP <span className="eyebrow-dot">/</span> CONTROLE OPERACIONAL</div><h1>{itemAtual.label}</h1><p>{itemAtual.desc}. Informações organizadas para facilitar a rotina.</p></div><div className="heading-mark" aria-hidden="true"><span>{itemAtual.icon}</span></div></div>
+          <DashboardInteligente key={pagina} modulo={pagina} />
           <div className="module-content" key={pagina}>{itemAtual.componente}</div>
           <footer className="workspace-footer"><span><b> EIXO SP</b> · Gestão operacional de frota</span><span>Plataforma interna <i className="footer-dot" /> Interface responsiva</span></footer>
         </main>
