@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useFirestoreCollection } from "./firestoreSync";
-import { db } from "./firebase";
 import * as XLSX from "xlsx";
 
 const ETAPAS = [
@@ -117,7 +116,7 @@ export default function Multas() {
       }
       const historico = Array.isArray(form["Histórico de etapas"]) ? [...form["Histórico de etapas"]] : [];
       if (etapaMudou) historico.push({ etapa: form["Etapa atual"], data: now, observacao: form["Observações finais"] || "" });
-      const novoRegistro = { ...form, Anexos: anexos, "Histórico de etapas": historico, "Data de criação": anterior?.["Data de criação"] || now, "Última atualização": now };
+      const dadosAtualizados = { ...form };\n      if (form["Etapa atual"] === "Enviado ao RH" && !dadosAtualizados["Data de envio ao RH"]) dadosAtualizados["Data de envio ao RH"] = now.slice(0, 16);\n      const novoRegistro = { ...dadosAtualizados, Anexos: anexos, "Histórico de etapas": historico, "Data de criação": anterior?.["Data de criação"] || now, "Última atualização": now };
       if (editIndex !== null) {
         setRegistros((current) => current.map((r, i) => i === editIndex ? { ...novoRegistro, __docId: r.__docId } : r));
       } else {
