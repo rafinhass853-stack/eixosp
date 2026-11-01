@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 
+const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+const dashboardCache = new Map();
 const MODULOS = {
   condutores: { collection: 'condutores', title: 'Visão dos condutores', description: 'Acompanhe cadastro, habilitação e qualidade dos dados.', icon: '👤', metrics: [['Total cadastrado', 'total'], ['Ativos', 'ativos'], ['CNH a verificar', 'cnh'], ['Dados incompletos', 'incompletos']] },
   veiculos: { collection: 'veiculos', title: 'Visão da frota', description: 'Entenda a composição da frota e identifique itens que precisam de atenção.', icon: '🚘', metrics: [['Veículos cadastrados', 'total'], ['Ativos', 'ativos'], ['Em atenção', 'atencao'], ['Dados incompletos', 'incompletos']] },
@@ -59,11 +61,27 @@ export default function DashboardInteligente({ modulo }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  // Cacheia cada painel por cinco minutos; o botão Atualizar força nova leitura.
   useEffect(() => {
     let alive = true;
-    setLoading(true); setError(false);
+    const cached = dashboardCache.get(config.collection);
+    if (refresh === 0 && cached && Date.now() - cached.updatedAt < DASHBOARD_CACHE_TTL_MS) {
+      queueMicrotask(() => {
+        if (!alive) return;
+        setRows(cached.rows);
+        setError(false);
+        setLoading(false);
+      });
+      return () => { alive = false; };
+    }
+    queueMicrotask(() => { if (alive) { setLoading(true); setError(false); } });
     getDocs(collection(db, config.collection))
-      .then((snapshot) => { if (alive) setRows(snapshot.docs.map((item) => item.data())); })
+      .then((snapshot) => {
+        if (!alive) return;
+        const nextRows = snapshot.docs.map((item) => item.data());
+        dashboardCache.set(config.collection, { rows: nextRows, updatedAt: Date.now() });
+        setRows(nextRows);
+      })
       .catch(() => { if (alive) { setRows([]); setError(true); } })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
