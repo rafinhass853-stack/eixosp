@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Component, useMemo, useState } from 'react';
 import Condutores from './Condutores';
 import Veiculos from './Veiculos';
 import Funcionarios from './Funcionarios';
@@ -15,6 +15,31 @@ const MENU = [
   { key: 'cobli', label: 'Cobli', desc: 'Registros e informações operacionais', icon: '📡', componente: <Cobli />, group: 'Operação' },
   { key: 'multas', label: 'Multas', desc: 'Infrações, prazos e acompanhamento', icon: '🚨', componente: <Multas />, group: 'Operação' },
 ];
+
+class ModuleErrorBoundary extends Component {
+  state = { error: null };
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('Erro ao renderizar o módulo:', error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="module-error" role="alert">
+          <h2>Não foi possível abrir este módulo</h2>
+          <p>Ocorreu um erro inesperado ao montar a tela. Tente novamente.</p>
+          <button type="button" onClick={() => window.location.reload()}>Recarregar aplicação</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function Menu() {
   const [pagina, setPagina] = useState('condutores');
@@ -65,8 +90,10 @@ export default function Menu() {
         </header>
         <main className="workspace">
           <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> EIXO SP <span className="eyebrow-dot">/</span> CONTROLE OPERACIONAL</div><h1>{itemAtual.label}</h1><p>{itemAtual.desc}. Informações organizadas para facilitar a rotina.</p></div><div className="heading-mark" aria-hidden="true"><span>{itemAtual.icon}</span></div></div>
-          <DashboardInteligente key={pagina} modulo={pagina} />
-          <div className="module-content" key={pagina}>{itemAtual.componente}</div>
+          <ModuleErrorBoundary key={pagina}>
+            <DashboardInteligente modulo={pagina} />
+            <div className="module-content">{itemAtual.componente}</div>
+          </ModuleErrorBoundary>
           <footer className="workspace-footer"><span><b> EIXO SP</b> · Gestão operacional de frota</span><span>Plataforma interna <i className="footer-dot" /> Interface responsiva</span></footer>
         </main>
       </section>
