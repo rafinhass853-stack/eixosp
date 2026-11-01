@@ -1,5 +1,4 @@
-// src/Menu.jsx
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Condutores from './Condutores';
 import Veiculos from './Veiculos';
 import Funcionarios from './Funcionarios';
@@ -7,111 +6,69 @@ import TicketLog from './TicketLog';
 import Cobli from './Cobli';
 import Multas from './Multas';
 
-/* ============================================================
-   ITENS DO MENU
-   Para adicionar uma nova página:
-   1. Crie o componente (ex.: src/Veiculos.jsx)
-   2. Importe aqui em cima
-   3. Adicione um objeto em MENU com { key, label, icon, componente }
-============================================================ */
 const MENU = [
-  {
-    key: 'condutores',
-    label: 'Condutores',
-    icon: '👤',
-    componente: <Condutores />,
-  },
-  {
-  key: 'multas',
-  label: 'Multas',
-  icon: '🚨',
-  componente: <Multas />,
-},
-  
-  {
-  key: 'ticketlog',
-  label: 'Ticket Log',
-  icon: '🎫',
-  componente: <TicketLog />,
-},
-  {
-    key: 'veiculos',
-    label: 'Veículos',
-    icon: '🚗',
-    componente: <Veiculos />,
-  },
-  {
-  key: 'funcionarios',
-  label: 'Funcionários',
-  icon: '🧑‍💼',
-  componente: <Funcionarios />,
-},
-{
-  key: 'cobli',
-  label: 'Cobli',
-  icon: '📡',
-  componente: <Cobli />,
-},
-  // Exemplo de próximos itens (descomente quando criar os componentes):
-  // {
-  //   key: 'checklists',
-  //   label: 'Checklists',
-  //   icon: '📋',
-  //   componente: <Checklists />,
-  // },
+  { key: 'condutores', label: 'Condutores', desc: 'Cadastro e habilitações', icon: '👤', componente: <Condutores />, group: 'Cadastros' },
+  { key: 'veiculos', label: 'Veículos', desc: 'Frota e informações operacionais', icon: '🚘', componente: <Veiculos />, group: 'Cadastros' },
+  { key: 'funcionarios', label: 'Funcionários', desc: 'Pessoas e estrutura', icon: '🧑‍💼', componente: <Funcionarios />, group: 'Cadastros' },
+  { key: 'ticketlog', label: 'Ticket Log', desc: 'Cadastros e controle', icon: '🎫', componente: <TicketLog />, group: 'Operação' },
+  { key: 'cobli', label: 'Cobli', desc: 'Rastreamento e integração', icon: '📡', componente: <Cobli />, group: 'Operação' },
+  { key: 'multas', label: 'Multas', desc: 'Infrações e acompanhamento', icon: '🚨', componente: <Multas />, group: 'Operação' },
 ];
 
 export default function Menu() {
   const [pagina, setPagina] = useState('condutores');
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [buscaMenu, setBuscaMenu] = useState('');
+  const itemAtual = MENU.find((m) => m.key === pagina) || MENU[0];
+  const grupos = useMemo(() => {
+    const termo = buscaMenu.trim().toLocaleLowerCase('pt-BR');
+    return ['Cadastros', 'Operação'].map((nome) => ({
+      nome,
+      itens: MENU.filter((item) => item.group === nome && (!termo || (item.label + ' ' + item.desc).toLocaleLowerCase('pt-BR').includes(termo))),
+    })).filter((grupo) => grupo.itens.length);
+  }, [buscaMenu]);
 
-  const itemAtual = MENU.find((m) => m.key === pagina);
+  function navegar(key) {
+    setPagina(key);
+    setMenuAberto(false);
+  }
 
   return (
-    <div className="min-h-screen flex bg-surface text-ink font-sans">
-      {/* ===================== SIDEBAR ===================== */}
-      <aside className="w-60 shrink-0 bg-white border-r border-gray-200 flex flex-col">
-        {/* Logo / título */}
-        <div className="px-5 py-5 border-b border-gray-100">
-          <h1 className="text-lg font-semibold text-brand-700">Frota</h1>
-          <p className="text-xs text-muted">Gestão de condutores</p>
+    <div className="app-shell">
+      {menuAberto && <button className="sidebar-scrim" aria-label="Fechar menu" onClick={() => setMenuAberto(false)} />}
+      <aside className={`app-sidebar ${menuAberto ? 'is-open' : ''}`}>
+        <div className="brand-lockup">
+          <div className="brand-symbol" aria-hidden="true"><span>eixo</span><b>SP</b></div>
+          <div className="brand-copy"><strong>Gestão de Frota</strong><span>PLATAFORMA OPERACIONAL</span></div>
         </div>
-
-        {/* Itens de navegação */}
-        <nav className="flex-1 p-3 space-y-1">
-          {MENU.map((item) => {
-            const ativo = pagina === item.key;
-            return (
-              <button
-                key={item.key}
-                onClick={() => setPagina(item.key)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-left transition ${
-                  ativo
-                    ? 'bg-brand-600 text-white font-semibold'
-                    : 'text-ink hover:bg-surface'
-                }`}
-              >
-                <span className="text-base leading-none">{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+        <div className="sidebar-status"><span className="status-dot" /> Ambiente operacional <span className="status-tag">PPCM</span></div>
+        <div className="nav-search"><span aria-hidden="true">⌕</span><input aria-label="Buscar módulo" placeholder="Buscar módulo..." value={buscaMenu} onChange={(e) => setBuscaMenu(e.target.value)} /></div>
+        <nav className="primary-nav" aria-label="Navegação principal">
+          {grupos.map((grupo) => <div className="nav-group" key={grupo.nome}>
+            <p className="nav-group-title">{grupo.nome}</p>
+            {grupo.itens.map((item) => <button key={item.key} onClick={() => navegar(item.key)} className={`nav-link ${pagina === item.key ? 'active' : ''}`} aria-current={pagina === item.key ? 'page' : undefined}>
+              <span className="nav-icon">{item.icon}</span><span className="nav-label">{item.label}<small>{item.desc}</small></span>{pagina === item.key && <span className="nav-current" />}
+            </button>)}
+          </div>)}
+          {grupos.length === 0 && <p className="nav-empty">Nenhum módulo encontrado.</p>}
         </nav>
-
-        {/* Rodapé opcional */}
-        <div className="px-4 py-3 border-t border-gray-100 text-xs text-muted">
-          v1.0
+        <div className="sidebar-bottom">
+          <div className="support-card"><span className="support-icon">✦</span><div><strong>Central de operação</strong><p>Seus dados, organizados em um só lugar.</p></div></div>
+          <div className="sidebar-foot"><span className="mini-brand">EIXO<span>SP</span></span><span>Gestão integrada <b>•</b> v1.1</span></div>
         </div>
       </aside>
 
-      {/* ===================== CONTEÚDO ===================== */}
-      <div className="flex-1 min-w-0">
-        {/* Header do topo (opcional — o Condutores tem o próprio header) */}
-        <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold">{itemAtual?.label || '—'}</h2>
+      <section className="app-main">
+        <header className="topbar">
+          <div className="topbar-left"><button className="mobile-menu-button" onClick={() => setMenuAberto(true)} aria-label="Abrir menu">☰</button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-divider">/</span><strong>{itemAtual.label}</strong></div></div>
+          <div className="topbar-right"><span className="topbar-date">{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date())}</span><span className="topbar-divider" /><div className="profile-chip"><span className="profile-avatar">ES</span><span><strong>Operações</strong><small>Gestão de frota</small></span></div></div>
         </header>
-
-        <main className="p-6">{itemAtual?.componente}</main>
-      </div>
+        <main className="workspace">
+          <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> EIXO SP <span className="eyebrow-dot">/</span> CONTROLE OPERACIONAL</div><h1>{itemAtual.label}</h1><p>{itemAtual.desc}. Acompanhe informações e rotinas da operação.</p></div><div className="heading-mark" aria-hidden="true"><span>{itemAtual.icon}</span></div></div>
+          <div className="module-content" key={pagina}>{itemAtual.componente}</div>
+          <footer className="workspace-footer"><span><b> EIXO SP</b> · Gestão operacional de frota</span><span>Plataforma interna <i className="footer-dot" /> Interface responsiva</span></footer>
+        </main>
+      </section>
     </div>
   );
 }
