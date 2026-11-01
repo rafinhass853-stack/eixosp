@@ -1,433 +1,218 @@
-// src/Multas.jsx
 import React, { useMemo, useRef, useState } from "react";
+import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useFirestoreCollection } from "./firestoreSync";
+import { db } from "./firebase";
 import * as XLSX from "xlsx";
 
-/**
- * Grupos visuais (somente para organizar o formulário/legenda).
- * NÃO afetam a importação — só a UX.
- */
-export const GRUPOS_MULTAS = {
-  "DADOS DA INFRAÇÃO": [
-    "AIT",
-    "ID",
-    "Data/Hora Recebimento do E-mail",
-    "Placa do Veículo",
-    "Data/Hora da Infração",
-    "Local / Descrição Breve da Infração",
-    "Prazo Limite Legal de Indicação",
-  ],
-  "IDENTIFICAÇÃO E DECISÃO": [
-    "Condutor Identificado (via Telemetria Cobli)",
-    "Gestor Responsável",
-    "Data/Hora Envio Notificação ao Gestor",
-    "Indicação do Condutor (Sim / Não)",
-    "Data/Hora Retorno do Gestor",
-  ],
-  "ACEITE E DOCUMENTAÇÃO": [
-    "Data/Hora Envio Termo para Assinatura",
-    "Data/Hora Retorno Termo Assinado",
-    "Locadora",
-  ],
-  "INDICAÇÃO DO CONDUTOR": [
-    "Data/Hora da Indicação",
-    "Data/Hora do Processo de Indicação Validado",
-  ],
-  "CONCLUSÃO E RH": [
-    "Data/Hora Envio ao RH",
-    "Consequência / Encaminhamento",
-    "SLA / Tempo Total",
-  ],
+const ETAPAS = [
+  "Infração cadastrada",
+  "Identificar condutor (Cobli)",
+  "Aguardando retorno do gestor",
+  "Termo enviado para assinatura",
+  "Termo assinado recebido",
+  "Indicação do condutor realizada",
+  "Indicação validada",
+  "Enviado ao RH",
+];
+
+const GRUPOS = [
+  { titulo: "Dados principais da infração", ajuda: "Informações da notificação e do auto de infração.", campos: [
+    ["AIT", "text", true], ["ID interno", "text"], ["Órgão autuador", "text"], ["Código da infração", "text"],
+    ["Descrição da infração", "text"], ["Natureza da infração", "select", false, ["Leve", "Média", "Grave", "Gravíssima", "A confirmar"]],
+    ["Valor da multa (R$)", "number"], ["Pontos na CNH", "number"], ["Data e hora da infração", "datetime-local"],
+    ["Data de recebimento da notificação", "date"], ["Data de recebimento do e-mail", "datetime-local"],
+    ["Prazo legal para indicação", "date"], ["Local da infração", "text"], ["Município", "text"], ["UF", "text"],
+    ["Número do processo / protocolo", "text"], ["Origem da notificação", "select", false, ["E-mail", "Portal", "Locadora", "Outro"]],
+  ]},
+  { titulo: "Veículo e operação", ajuda: "Identifique o veículo e o contexto operacional.", campos: [
+    ["Placa", "text", true], ["Número da frota", "text"], ["Modelo do veículo", "text"], ["Propriedade / locadora", "text"],
+    ["Unidade / base operacional", "text"], ["Tipo de operação", "text"], ["Observações da operação", "textarea"],
+  ]},
+  { titulo: "Identificação do condutor", ajuda: "A identificação no Cobli continua manual. Registre aqui o resultado da conferência.", campos: [
+    ["Condutor identificado", "text"], ["Matrícula do condutor", "text"], ["Data da identificação", "date"],
+    ["Responsável pela conferência", "text"], ["Evidência / observação Cobli", "textarea"],
+    ["Gestor responsável", "text"], ["Data de envio ao gestor", "datetime-local"], ["Data de retorno do gestor", "datetime-local"],
+    ["Decisão do gestor", "select", false, ["Aguardando", "Confirmou condutor", "Contestou identificação", "Sem retorno", "Não se aplica"]],
+    ["Observação do gestor", "textarea"],
+  ]},
+  { titulo: "Termo e indicação", ajuda: "Controle as datas do termo, assinatura e indicação.", campos: [
+    ["Data de envio do termo", "datetime-local"], ["Data de recebimento do termo assinado", "datetime-local"],
+    ["Assinatura conferida por", "text"], ["Data da indicação do condutor", "date"],
+    ["Protocolo da indicação", "text"], ["Data de validação da indicação", "date"],
+    ["Resultado da validação", "select", false, ["Pendente", "Validada", "Rejeitada", "Não se aplica"]],
+    ["Observações da indicação", "textarea"],
+  ]},
+  { titulo: "Encaminhamento ao RH — etapa final", ajuda: "O acompanhamento do PPCM termina quando o processo é enviado ao RH.", campos: [
+    ["Data de envio ao RH", "datetime-local"], ["Destinatário / área do RH", "text"],
+    ["Protocolo ou confirmação do RH", "text"], ["Encaminhamento / consequência", "textarea"],
+    ["Observações finais", "textarea"],
+  ]},
+];
+
+const CAMPOS = ["Etapa atual", ...GRUPOS.flatMap((g) => g.campos.map((c) => c[0])), "Data de criação", "Última atualização", "Anexos", "Histórico de etapas"];
+const vazio = () => CAMPOS.reduce((acc, c) => ({ ...acc, [c]: c === "Etapa atual" ? ETAPAS[0] : "" }), { Anexos: [], "Histórico de etapas": [] });
+const fmt = (value) => {
+  if (!value) return "Não informado";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString("pt-BR");
 };
-
-/**
- * Lista COMPLETA de campos (na ordem em que aparecem no formulário)
- */
-export const CAMPOS_MULTA = [
-  "Status do Processo",
-  // DADOS DA INFRAÇÃO
-  "AIT",
-  "ID",
-  "Data/Hora Recebimento do E-mail",
-  "Placa do Veículo",
-  "Data/Hora da Infração",
-  "Local / Descrição Breve da Infração",
-  "Prazo Limite Legal de Indicação",
-  // IDENTIFICAÇÃO E DECISÃO
-  "Condutor Identificado (via Telemetria Cobli)",
-  "Gestor Responsável",
-  "Data/Hora Envio Notificação ao Gestor",
-  "Indicação do Condutor (Sim / Não)",
-  "Data/Hora Retorno do Gestor",
-  // ACEITE E DOCUMENTAÇÃO
-  "Data/Hora Envio Termo para Assinatura",
-  "Data/Hora Retorno Termo Assinado",
-  "Locadora",
-  // INDICAÇÃO DO CONDUTOR
-  "Data/Hora da Indicação",
-  "Data/Hora do Processo de Indicação Validado",
-  // CONCLUSÃO E RH
-  "Data/Hora Envio ao RH",
-  "Consequência / Encaminhamento",
-  "SLA / Tempo Total",
-];
-
-/** campos exibidos na tabela por padrão */
-const CAMPOS_TABELA = [
-  "Status do Processo",
-  "AIT",
-  "ID",
-  "Placa do Veículo",
-  "Data/Hora da Infração",
-  "Prazo Limite Legal de Indicação",
-  "Gestor Responsável",
-  "Indicação do Condutor (Sim / Não)",
-  "Locadora",
-  "SLA / Tempo Total",
-];
-
-const vazio = () =>
-  CAMPOS_MULTA.reduce((acc, c) => ({ ...acc, [c]: "" }), {});
+const slug = (s) => String(s || "arquivo").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 90);
 
 export default function Multas() {
-  const [registros, setRegistros, removeRegistro] = useFirestoreCollection("multas", (r) => r["ID"] || r["AIT"] || r.id);
+  const [registros, setRegistros, removeRegistro] = useFirestoreCollection("multas", (r) => r["AIT"] || r["ID interno"] || r.id);
   const [form, setForm] = useState(vazio());
   const [editIndex, setEditIndex] = useState(null);
-  const [aba, setAba] = useState("lista"); // lista | form | importar
+  const [aba, setAba] = useState("lista");
   const [busca, setBusca] = useState("");
-  const [erroImport, setErroImport] = useState("");
+  const [filtroEtapa, setFiltroEtapa] = useState("Todas");
+  const [erro, setErro] = useState("");
+  const [arquivos, setArquivos] = useState([]);
+  const [salvando, setSalvando] = useState(false);
   const fileRef = useRef(null);
 
-  const listaFiltrada = useMemo(() => {
-    if (!busca.trim()) return registros;
-    const q = busca.toLowerCase();
-    return registros.filter((r) =>
-      [
-        r["AIT"],
-        r["ID"],
-        r["Placa do Veículo"],
-        r["Gestor Responsável"],
-        r["Locadora"],
-        r["Status do Processo"],
-      ]
-        .filter(Boolean)
-        .some((x) => String(x).toLowerCase().includes(q))
-    );
-  }, [registros, busca]);
+  const abertas = registros.filter((r) => r["Etapa atual"] !== "Enviado ao RH");
+  const enviadasRh = registros.filter((r) => r["Etapa atual"] === "Enviado ao RH");
+  const vencidas = abertas.filter((r) => r["Prazo legal para indicação"] && new Date(r["Prazo legal para indicação"] + "T23:59:59") < new Date());
+  const lista = useMemo(() => registros.filter((r) => {
+    const q = busca.trim().toLocaleLowerCase("pt-BR");
+    const matches = !q || ["AIT", "ID interno", "Placa", "Descrição da infração", "Condutor identificado", "Gestor responsável", "Etapa atual"].some((k) => String(r[k] || "").toLocaleLowerCase("pt-BR").includes(q));
+    return matches && (filtroEtapa === "Todas" || (filtroEtapa === "Em acompanhamento" ? r["Etapa atual"] !== "Enviado ao RH" : r["Etapa atual"] === filtroEtapa));
+  }), [registros, busca, filtroEtapa]);
 
+  function novo() {
+    setForm(vazio()); setEditIndex(null); setArquivos([]); setErro(""); setAba("form");
+  }
+  function editar(index) {
+    setForm({ ...vazio(), ...registros[index] }); setEditIndex(index); setArquivos([]); setErro(""); setAba("form");
+  }
   function onChange(campo, valor) {
     setForm((f) => ({ ...f, [campo]: valor }));
   }
 
-  function salvar(e) {
-    e.preventDefault();
-    if (!form["AIT"] && !form["ID"]) {
-      alert("Informe ao menos AIT ou ID.");
-      return;
+  async function salvar(e) {
+    e.preventDefault(); setErro("");
+    if (!String(form.AIT || "").trim() && !String(form["ID interno"] || "").trim()) {
+      setErro("Informe o AIT ou o ID interno para identificar a infração."); return;
     }
-    if (editIndex !== null) {
-      const copia = [...registros];
-      copia[editIndex] = form;
-      setRegistros(copia);
-    } else {
-      setRegistros((v) => [...v, form]);
-    }
-    setForm(vazio());
-    setEditIndex(null);
-    setAba("lista");
-  }
+    const duplicado = registros.findIndex((r, i) => i !== editIndex && (
+      (form.AIT && String(r.AIT || "").trim().toLowerCase() === String(form.AIT).trim().toLowerCase()) ||
+      (form["ID interno"] && String(r["ID interno"] || "").trim().toLowerCase() === String(form["ID interno"]).trim().toLowerCase())
+    ));
+    if (duplicado >= 0) { setErro("Já existe uma multa com esse AIT ou ID interno. Abra o registro existente para atualizá-lo."); return; }
 
-  function editar(i) {
-    setForm({ ...vazio(), ...registros[i] });
-    setEditIndex(i);
-    setAba("form");
-  }
-
-  async function excluir(i) {
-    if (!confirm("Excluir esta multa?")) return;
-    await removeRegistro(registros[i]);
-  }
-
-  function novo() {
-    setForm(vazio());
-    setEditIndex(null);
-    setAba("form");
-  }
-
-  // ---------------- IMPORTAR PLANILHA ----------------
-  function baixarModelo() {
-    // Gera uma aba por grupo? Não — o cabeçalho do Excel é uma linha só.
-    // Mantemos todos os campos na linha 1 e, na linha 2, um registro em branco.
-    const ws = XLSX.utils.json_to_sheet([vazio()], { header: CAMPOS_MULTA });
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Multas");
-    XLSX.writeFile(wb, "modelo_multas.xlsx");
-  }
-
-  async function importarArquivo(file) {
-    setErroImport("");
+    setSalvando(true);
     try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array", cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const dados = XLSX.utils.sheet_to_json(ws, { defval: "", raw: false });
-
-      if (!dados.length) {
-        setErroImport("Planilha vazia.");
-        return;
+      const now = new Date().toISOString();
+      const anterior = editIndex !== null ? registros[editIndex] : null;
+      const etapaMudou = !anterior || anterior["Etapa atual"] !== form["Etapa atual"];
+      let anexos = Array.isArray(form.Anexos) ? [...form.Anexos] : [];
+      if (arquivos.length) {
+        const storage = getStorage();
+        for (const file of arquivos) {
+          const path = `multas/${slug(form.AIT || form["ID interno"])}-${Date.now()}/${Date.now()}-${slug(file.name)}`;
+          const fileRef = ref(storage, path);
+          await uploadBytes(fileRef, file, { contentType: file.type || "application/octet-stream" });
+          anexos.push({ nome: file.name, tipo: file.type || "Arquivo", tamanho: file.size, url: await getDownloadURL(fileRef), caminho: path, enviadoEm: now });
+        }
       }
-
-      const normaliza = (s) =>
-        String(s).trim().replace(/\s+/g, " ").toLowerCase();
-
-      const mapaCabecalho = new Map(
-        CAMPOS_MULTA.map((c) => [normaliza(c), c])
-      );
-
-      const importados = dados.map((linha) => {
-        const obj = vazio();
-        Object.entries(linha).forEach(([k, v]) => {
-          const campo = mapaCabecalho.get(normaliza(k));
-          if (campo && campo in obj) {
-            obj[campo] = v == null ? "" : String(v);
-          }
-        });
-        return obj;
-      });
-
-      setRegistros((atual) => [...atual, ...importados]);
-      setAba("lista");
+      const historico = Array.isArray(form["Histórico de etapas"]) ? [...form["Histórico de etapas"]] : [];
+      if (etapaMudou) historico.push({ etapa: form["Etapa atual"], data: now, observacao: form["Observações finais"] || "" });
+      const novoRegistro = { ...form, Anexos: anexos, "Histórico de etapas": historico, "Data de criação": anterior?.["Data de criação"] || now, "Última atualização": now };
+      if (editIndex !== null) {
+        setRegistros((current) => current.map((r, i) => i === editIndex ? { ...novoRegistro, __docId: r.__docId } : r));
+      } else {
+        setRegistros((current) => [...current, novoRegistro]);
+      }
+      setForm(vazio()); setEditIndex(null); setArquivos([]); setAba("lista");
     } catch (err) {
-      console.error(err);
-      setErroImport("Falha ao ler arquivo. Use .xlsx, .xls ou .csv.");
+      console.error("Erro ao salvar processo de multa", err);
+      setErro("Não foi possível salvar ou enviar os anexos. Confira as permissões do Firestore/Storage e tente novamente. Os arquivos podem precisar ser selecionados novamente.");
+    } finally { setSalvando(false); }
+  }
+
+  async function excluir(index) {
+    if (!confirm("Excluir permanentemente este processo de multa?")) return;
+    await removeRegistro(registros[index]);
+  }
+
+  function baixarModelo() {
+    const ws = XLSX.utils.json_to_sheet([vazio()], { header: CAMPOS });
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Controle de Multas");
+    XLSX.writeFile(wb, "modelo_controle_multas.xlsx");
+  }
+  async function importarArquivo(file) {
+    setErro("");
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: false });
+      if (!rows.length) { setErro("A planilha está vazia."); return; }
+      const normaliza = (s) => String(s).trim().replace(/\s+/g, " ").toLowerCase();
+      const mapa = new Map(CAMPOS.map((c) => [normaliza(c), c]));
+      let adicionados = 0, ignorados = 0;
+      const novos = [];
+      rows.forEach((row) => {
+        const item = vazio();
+        Object.entries(row).forEach(([k, v]) => { const campo = mapa.get(normaliza(k)); if (campo) item[campo] = v == null ? "" : String(v); });
+        const exists = registros.some((r) => (item.AIT && String(r.AIT || "").trim().toLowerCase() === String(item.AIT).trim().toLowerCase()) || (item["ID interno"] && String(r["ID interno"] || "").trim().toLowerCase() === String(item["ID interno"]).trim().toLowerCase()));
+        if (exists || (!item.AIT && !item["ID interno"])) ignorados++; else { novos.push(item); adicionados++; }
+      });
+      if (novos.length) setRegistros((current) => [...current, ...novos]);
+      setErro(`Importação analisada: ${adicionados} novo(s) registro(s) para adicionar; ${ignorados} linha(s) ignoradas por duplicidade ou falta de AIT/ID. Registros existentes não foram sobrescritos.`);
+    } catch (err) {
+      console.error(err); setErro("Falha ao ler a planilha. Use .xlsx, .xls ou .csv.");
     }
   }
 
-  // ---------------------------------------------------
-
-  return (
-    <div className="font-sans">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">Multas</h1>
-        <nav className="flex gap-2">
-          <button
-            onClick={() => setAba("lista")}
-            className={`px-3 py-1.5 rounded-md text-sm border ${
-              aba === "lista"
-                ? "bg-brand-600 text-white border-brand-600"
-                : "bg-white hover:bg-surface"
-            }`}
-          >
-            Lista
-          </button>
-          <button
-            onClick={novo}
-            className="px-3 py-1.5 rounded-md text-sm bg-brand-600 text-white"
-          >
-            Nova Multa
-          </button>
-          <button
-            onClick={() => setAba("importar")}
-            className={`px-3 py-1.5 rounded-md text-sm border ${
-              aba === "importar"
-                ? "bg-brand-600 text-white border-brand-600"
-                : "bg-white hover:bg-surface"
-            }`}
-          >
-            Importar Planilha
-          </button>
-        </nav>
-      </div>
-
-      {/* LISTA */}
-      {aba === "lista" && (
-        <section>
-          <div className="flex gap-2 mb-3">
-            <input
-              placeholder="Buscar por AIT, ID, placa, gestor, locadora..."
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              className="flex-1 px-3 py-2 border rounded-md text-sm"
-            />
-            <button
-              onClick={baixarModelo}
-              className="px-3 py-2 text-sm border rounded-md bg-white hover:bg-surface"
-            >
-              Baixar modelo
-            </button>
-          </div>
-
-          <div className="overflow-x-auto border rounded-md">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left">
-                <tr>
-                  {CAMPOS_TABELA.map((c) => (
-                    <th key={c} className="px-3 py-2 font-medium">
-                      {c}
-                    </th>
-                  ))}
-                  <th className="px-3 py-2 font-medium">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {listaFiltrada.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={CAMPOS_TABELA.length + 1}
-                      className="px-3 py-4 text-center text-muted"
-                    >
-                      Nenhuma multa cadastrada.
-                    </td>
-                  </tr>
-                )}
-                {listaFiltrada.map((r) => {
-                  const idxReal = registros.indexOf(r);
-                  return (
-                    <tr key={idxReal} className="border-t">
-                      {CAMPOS_TABELA.map((c) => (
-                        <td key={c} className="px-3 py-2">
-                          {r[c]}
-                        </td>
-                      ))}
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <button
-                          onClick={() => editar(idxReal)}
-                          className="text-brand-700 hover:underline mr-3"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => excluir(idxReal)}
-                          className="text-red-600 hover:underline"
-                        >
-                          Excluir
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {/* FORMULÁRIO */}
-      {aba === "form" && (
-        <form onSubmit={salvar}>
-          <h2 className="text-lg font-semibold mb-3">
-            {editIndex !== null ? "Editar multa" : "Nova multa"}
-          </h2>
-
-          {/* Status do Processo (destacado) */}
-          <div className="mb-4">
-            <label className="flex flex-col text-sm max-w-xs">
-              <span className="text-xs text-muted mb-1">
-                Status do Processo
-              </span>
-              <input
-                value={form["Status do Processo"] ?? ""}
-                onChange={(e) => onChange("Status do Processo", e.target.value)}
-                className="px-2 py-1.5 border rounded-md"
-              />
-            </label>
-          </div>
-
-          {/* Grupos */}
-          {Object.entries(GRUPOS_MULTAS).map(([grupo, campos]) => (
-            <fieldset
-              key={grupo}
-              className="border rounded-md p-3 mb-4"
-            >
-              <legend className="px-2 text-xs font-semibold text-brand-700 uppercase">
-                {grupo}
-              </legend>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {campos.map((campo) => (
-                  <label key={campo} className="flex flex-col text-sm">
-                    <span className="text-xs text-muted mb-1">{campo}</span>
-                    <input
-                      value={form[campo] ?? ""}
-                      onChange={(e) => onChange(campo, e.target.value)}
-                      className="px-2 py-1.5 border rounded-md"
-                    />
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ))}
-
-          <div className="mt-4 flex gap-2">
-            <button
-              type="submit"
-              className="px-3 py-1.5 rounded-md text-sm bg-brand-600 text-white"
-            >
-              Salvar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAba("lista");
-                setEditIndex(null);
-              }}
-              className="px-3 py-1.5 rounded-md text-sm border bg-white hover:bg-surface"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* IMPORTAR */}
-      {aba === "importar" && (
-        <section>
-          <h2 className="text-lg font-semibold mb-2">
-            Importar planilha de multas
-          </h2>
-          <p className="text-sm text-muted mb-3">
-            Formatos aceitos: <b>.xlsx</b>, <b>.xls</b>, <b>.csv</b>. A primeira
-            linha deve conter os cabeçalhos iguais aos campos abaixo.
-          </p>
-          <div className="flex gap-2 mb-3">
-            <button
-              onClick={baixarModelo}
-              className="px-3 py-2 text-sm border rounded-md bg-white hover:bg-surface"
-            >
-              Baixar modelo (.xlsx)
-            </button>
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="px-3 py-2 text-sm bg-brand-600 text-white rounded-md"
-            >
-              Selecionar arquivo
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) importarArquivo(f);
-                e.target.value = "";
-              }}
-            />
-          </div>
-
-          {erroImport && <p className="text-red-600 text-sm">{erroImport}</p>}
-
-          <details className="text-sm mt-2">
-            <summary className="cursor-pointer">
-              Campos esperados ({CAMPOS_MULTA.length})
-            </summary>
-            <ul className="columns-2 md:columns-3 gap-6 text-xs mt-2">
-              {CAMPOS_MULTA.map((c) => (
-                <li key={c}>{c}</li>
-              ))}
-            </ul>
-          </details>
-        </section>
-      )}
-    </div>
+  const inputField = ([campo, tipo, obrigatorio, opcoes]) => (
+    <label key={campo} className={`fine-field ${tipo === "textarea" ? "fine-field-wide" : ""}`}>
+      <span>{campo}{obrigatorio ? " *" : ""}</span>
+      {tipo === "select" ? <select value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} required={!!obrigatorio}>
+        <option value="">Selecione...</option>{opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select> : tipo === "textarea" ? <textarea rows={3} value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} /> :
+        <input type={tipo} min={tipo === "number" ? "0" : undefined} step={tipo === "number" && campo.includes("Valor") ? "0.01" : "1"} value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} required={!!obrigatorio} />}
+    </label>
   );
+
+  return <div className="fines-app">
+    <section className="fine-overview">
+      <div className="fine-overview-title"><div><span className="fine-kicker">CONTROLE DE PROCESSOS</span><h2>Gestão de multas</h2><p>Registre a infração, avance as etapas e reúna evidências até o envio ao RH.</p></div><button type="button" className="fine-primary" onClick={novo}>＋ Nova infração</button></div>
+      <div className="fine-kpis">
+        <div className="fine-kpi"><span>Em acompanhamento</span><strong>{abertas.length}</strong><small>Processos ainda não enviados ao RH</small></div>
+        <div className="fine-kpi fine-kpi-alert"><span>Prazo legal vencido</span><strong>{vencidas.length}</strong><small>Confira o prazo e a situação de cada processo</small></div>
+        <div className="fine-kpi fine-kpi-done"><span>Enviadas ao RH</span><strong>{enviadasRh.length}</strong><small>Etapa final concluída no PPCM</small></div>
+      </div>
+    </section>
+
+    <div className="fine-toolbar">
+      <div className="fine-search"><span>⌕</span><input placeholder="Buscar por AIT, placa, condutor, gestor..." value={busca} onChange={(e) => setBusca(e.target.value)} /></div>
+      <select aria-label="Filtrar etapa" value={filtroEtapa} onChange={(e) => setFiltroEtapa(e.target.value)}><option>Todas</option><option>Em acompanhamento</option>{ETAPAS.map((etapa) => <option key={etapa}>{etapa}</option>)}</select>
+      <button type="button" className="fine-secondary" onClick={baixarModelo}>Baixar modelo Excel</button>
+      <button type="button" className="fine-secondary" onClick={() => setAba(aba === "importar" ? "lista" : "importar")}>Importar</button>
+    </div>
+
+    {aba === "importar" && <section className="fine-panel fine-import"><h3>Importar processos existentes</h3><p>Importa apenas linhas com AIT ou ID interno ainda não cadastrado. Não sobrescreve registros existentes.</p><input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) importarArquivo(f); e.target.value = ""; }} /><p className="fine-message">A planilha deve usar os cabeçalhos do modelo Excel.</p>{erro && <p className="fine-error">{erro}</p>}</section>}
+
+    {aba === "form" ? <form className="fine-editor" onSubmit={salvar}>
+      <div className="fine-editor-head"><div><span className="fine-kicker">{editIndex !== null ? "ATUALIZAR PROCESSO" : "NOVO REGISTRO"}</span><h2>{editIndex !== null ? `Infração ${form.AIT || form["ID interno"]}` : "Cadastrar infração"}</h2><p>Preencha o que já souber. Você pode salvar e completar os dados conforme o processo evolui.</p></div><button type="button" className="fine-secondary" onClick={() => setAba("lista")}>Voltar à lista</button></div>
+      <section className="fine-panel fine-stage-panel"><div><label className="fine-stage-label" htmlFor="etapa-multa">Etapa atual do processo</label><p>Altere esta etapa manualmente conforme executar cada ação.</p></div><select id="etapa-multa" value={form["Etapa atual"] || ETAPAS[0]} onChange={(e) => onChange("Etapa atual", e.target.value)}>{ETAPAS.map((etapa) => <option key={etapa}>{etapa}</option>)}</select><div className="fine-progress">{ETAPAS.map((etapa, i) => <div key={etapa} className={`fine-progress-step ${ETAPAS.indexOf(form["Etapa atual"]) >= i ? "is-reached" : ""}`}><span>{i + 1}</span><small>{etapa}</small></div>)}</div></section>
+      {GRUPOS.map((grupo) => <fieldset className="fine-panel fine-fieldset" key={grupo.titulo}><legend>{grupo.titulo}</legend><p>{grupo.ajuda}</p><div className="fine-fields">{grupo.campos.map(inputField)}</div></fieldset>)}
+      <section className="fine-panel fine-attachments"><div><h3>Fotos, documentos e assinaturas</h3><p>Anexe notificações, fotos, termos assinados, protocolos e outras evidências relacionadas à multa.</p></div><label className="fine-upload"><span>＋ Selecionar arquivos</span><input ref={fileRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => setArquivos((prev) => [...prev, ...Array.from(e.target.files || [])])} /></label>
+        {arquivos.length > 0 && <ul className="fine-file-list">{arquivos.map((f, i) => <li key={f.name + i}><span>📎 {f.name}</span><button type="button" onClick={() => setArquivos((prev) => prev.filter((_, j) => j !== i))}>Remover</button></li>)}</ul>}
+        {Array.isArray(form.Anexos) && form.Anexos.length > 0 && <div className="fine-existing-files"><strong>Arquivos já anexados</strong>{form.Anexos.map((a, i) => <div key={a.caminho || a.url || i}><a href={a.url} target="_blank" rel="noreferrer">{a.nome || "Abrir anexo"}</a><button type="button" onClick={() => onChange("Anexos", form.Anexos.filter((_, j) => j !== i))}>Remover da ficha</button></div>)}</div>}
+      </section>
+      <section className="fine-panel fine-history"><h3>Histórico de etapas</h3><p>O sistema registra a data da alteração quando você salva uma nova etapa.</p>{Array.isArray(form["Histórico de etapas"]) && form["Histórico de etapas"].length ? <ol>{form["Histórico de etapas"].slice().reverse().map((h, i) => <li key={i}><strong>{h.etapa}</strong><span>{new Date(h.data).toLocaleString("pt-BR")}</span></li>)}</ol> : <p className="fine-empty">O histórico será criado ao salvar o registro.</p>}</section>
+      {erro && <div className="fine-error">{erro}</div>}
+      <div className="fine-form-actions"><button type="button" className="fine-secondary" onClick={() => setAba("lista")}>Cancelar</button><button type="submit" className="fine-primary" disabled={salvando}>{salvando ? "Salvando..." : "Salvar processo"}</button></div>
+    </form> : aba === "lista" ? <section className="fine-card-grid">
+      {lista.length === 0 && <div className="fine-empty-card"><span>▤</span><h3>Nenhuma infração encontrada</h3><p>Cadastre a primeira infração ou ajuste os filtros da busca.</p><button className="fine-primary" onClick={novo}>Cadastrar infração</button></div>}
+      {lista.map((r) => { const idx = registros.indexOf(r); const etapa = r["Etapa atual"] || ETAPAS[0]; const done = etapa === "Enviado ao RH"; const late = !done && r["Prazo legal para indicação"] && new Date(r["Prazo legal para indicação"] + "T23:59:59") < new Date(); return <article className="fine-process-card" key={r.__docId || r.AIT || idx}>
+        <div className="fine-card-top"><span className={`fine-status ${done ? "status-done" : late ? "status-late" : "status-open"}`}>{done ? "Enviado ao RH" : late ? "Prazo vencido" : "Em andamento"}</span><button className="fine-more" title="Editar processo" onClick={() => editar(idx)}>✎</button></div>
+        <div className="fine-card-title"><h3>{r.AIT || "AIT não informado"}</h3><span>{r["Placa"] || "Sem placa"}</span></div>
+        <p className="fine-card-description">{r["Descrição da infração"] || "Descrição da infração ainda não preenchida"}</p>
+        <div className="fine-card-facts"><div><small>Data da infração</small><strong>{fmt(r["Data e hora da infração"])}</strong></div><div><small>Prazo legal</small><strong className={late ? "fine-text-danger" : ""}>{fmt(r["Prazo legal para indicação"])}</strong></div><div><small>Condutor</small><strong>{r["Condutor identificado"] || "A identificar"}</strong></div><div><small>Valor</small><strong>{r["Valor da multa (R$)"] !== "" && r["Valor da multa (R$)"] != null ? Number(r["Valor da multa (R$)"]).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "Não informado"}</strong></div></div>
+        <div className="fine-card-stage"><span>Etapa atual</span><strong>{etapa}</strong><div className="fine-card-progress"><i style={{ width: ((ETAPAS.indexOf(etapa) + 1) / ETAPAS.length * 100) + "%" }} /></div></div>
+        <div className="fine-card-bottom"><span>📎 {(r.Anexos || []).length} anexo(s)</span><button onClick={() => editar(idx)}>Abrir processo →</button><button className="fine-delete" onClick={() => excluir(idx)} aria-label="Excluir processo">Excluir</button></div>
+      </article>; })}
+    </section> : null}
+  </div>;
 }
