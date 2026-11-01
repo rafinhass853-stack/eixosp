@@ -12,6 +12,8 @@ import {
 } from './schemaCondutores';
 
 const COL = 'condutores';
+const CACHE_TTL_MS = 5 * 60 * 1000;
+let condutoresCache = { rows: null, updatedAt: 0 };
 
 /* ============================================================
    COMPONENTE PRINCIPAL
@@ -30,12 +32,18 @@ export default function Condutores() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const carregar = async () => {
+  const carregar = async ({ force = false } = {}) => {
+    if (!force && condutoresCache.rows && Date.now() - condutoresCache.updatedAt < CACHE_TTL_MS) {
+      setCondutores(condutoresCache.rows);
+      return;
+    }
     setCarregando(true);
     try {
       const q = query(collection(db, COL), orderBy('nome'));
       const snap = await getDocs(q);
-      setCondutores(snap.docs.map((d) => ({ cpf: d.id, ...d.data() })));
+      const rows = snap.docs.map((d) => ({ cpf: d.id, ...d.data() }));
+      condutoresCache = { rows, updatedAt: Date.now() };
+      setCondutores(rows);
     } catch (e) {
       console.error(e);
       notificar('Erro ao carregar: ' + e.message, 'bad');
@@ -44,6 +52,8 @@ export default function Condutores() {
     }
   };
 
+  // A leitura assíncrona inicial precisa ocorrer uma única vez por montagem.
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
   useEffect(() => { carregar(); }, []);
 
   const filtrados = useMemo(() => {
@@ -63,8 +73,10 @@ export default function Condutores() {
     if (!confirm('Excluir este condutor? Não pode ser desfeito.')) return;
     try {
       await deleteDoc(doc(db, COL, cpf));
+      const rows = condutores.filter((item) => item.cpf !== cpf);
+      condutoresCache = { rows, updatedAt: Date.now() };
+      setCondutores(rows);
       notificar('Condutor excluído.');
-      carregar();
     } catch (e) {
       notificar('Erro ao excluir: ' + e.message, 'bad');
     }
@@ -106,7 +118,7 @@ export default function Condutores() {
             totalGeral={condutores.length}
             busca={busca} setBusca={setBusca}
             filtroStatus={filtroStatus} setFiltroStatus={setFiltroStatus}
-            carregando={carregando} onRecarregar={carregar}
+            carregando={carregando} onRecarregar={() => carregar({ force: true })}
             onVer={(c) => setDrawer({ modo: 'view', dados: c })}
             onEditar={(c) => setDrawer({ modo: 'edit', dados: c })}
             onExcluir={(c) => excluir(c.cpf)}
@@ -114,13 +126,13 @@ export default function Condutores() {
         )}
         {aba === 'novo' && (
           <NovoView
-            onSalvo={() => { carregar(); setAba('lista'); }}
+            onSalvo={(row) => { atualizarLocal(row); setAba('lista'); }}
             notificar={notificar}
           />
         )}
         {aba === 'importar' && (
           <ImportarView
-            onConcluido={() => { carregar(); setAba('lista'); }}
+            onConcluido={(rows) => { atualizarLocal(rows); setAba('lista'); }}
             notificar={notificar}
           />
         )}
@@ -131,7 +143,7 @@ export default function Condutores() {
           modo={drawer.modo}
           dados={drawer.dados}
           onFechar={() => setDrawer(null)}
-          onSalvo={() => { setDrawer(null); carregar(); notificar('Condutor atualizado.'); }}
+          onSalvo={(row) => { atualizarLocal(row); setDrawer(null); notificar('Condutor atualizado.'); }}
           notificar={notificar}
         />
       )}
@@ -147,6 +159,17 @@ export default function Condutores() {
       )}
     </div>
   );
+
+  function atualizarLocal(rows) {
+    const atualizacoes = Array.isArray(rows) ? rows : [rows];
+    setCondutores((anteriores) => {
+      const porCpf = new Map(anteriores.map((item) => [item.cpf, item]));
+      atualizacoes.filter(Boolean).forEach((item) => porCpf.set(item.cpf, { ...porCpf.get(item.cpf), ...item }));
+      const resultado = Array.from(porCpf.values());
+      condutoresCache = { rows: resultado, updatedAt: Date.now() };
+      return resultado;
+    });
+  }
 }
 
 /* ============================================================
@@ -312,7 +335,7 @@ function NovoView({ onSalvo, notificar }) {
           origem: 'manual',
         });
         notificar('Condutor cadastrado com sucesso!');
-        onSalvo();
+        onSalvo({ ...form, cpf: cpfNorm });
       }
     } catch (err) {
       console.error(err);
@@ -416,15 +439,17 @@ function ImportarView({ onConcluido, notificar }) {
     if (!preview) return;
     setGravando(true);
     try {
-      const batch = writeBatch(db);
+      const existentes = sobrescrever
+        ? new Set()
+        : new Set((await getDocs(collection(db, COL))).docs.map((item) => item.id));
+      const vistos = new Set(existentes);
+      let batch = writeBatch(db);
+      let noLote = 0;
       let gravados = 0;
 
       for (const linha of preview.linhas) {
         const ref = doc(db, COL, linha.cpf);
-        if (!sobrescrever) {
-          const existente = await getDoc(ref);
-          if (existente.exists()) continue;
-        }
+        if (!sobrescrever && vistos.has(linha.cpf)) continue;
         const { cpf, ...resto } = linha;
         batch.set(
           ref,
@@ -437,18 +462,24 @@ function ImportarView({ onConcluido, notificar }) {
           },
           { merge: true },
         );
+        vistos.add(linha.cpf);
+        noLote += 1;
         gravados += 1;
+        if (noLote === 450) {
+          await batch.commit();
+          batch = writeBatch(db);
+          noLote = 0;
+        }
       }
 
       if (gravados === 0) {
         notificar('Nada a gravar (todos já existem). Marque "sobrescrever".', 'warn');
         return;
       }
-
-      await batch.commit();
+      if (noLote > 0) await batch.commit();
       notificar(`${gravados} condutor(es) importado(s).`);
       setPreview(null);
-      onConcluido();
+      onConcluido(preview.linhas);
     } catch (e) {
       console.error(e);
       notificar('Erro ao gravar: ' + e.message, 'bad');
@@ -575,7 +606,7 @@ function Drawer({ modo, dados, onFechar, onSalvo, notificar }) {
         { ...form, cpf: cpfNorm, atualizadoEm: serverTimestamp() },
         { merge: true },
       );
-      onSalvo();
+      onSalvo({ ...form, cpf: cpfNorm });
     } catch (e) {
       console.error(e);
       notificar('Erro ao salvar: ' + e.message, 'bad');

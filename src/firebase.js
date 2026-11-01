@@ -1,6 +1,11 @@
 // src/firebase.js
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBHHj0PaLHEfRxxzYuOrHDd4SvuyAcpenk',
@@ -14,5 +19,18 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const db = getFirestore(app);
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
+} catch (error) {
+  // Fallback para ambientes que bloqueiam IndexedDB ou já inicializaram o Firestore.
+  console.warn('Cache persistente indisponível; usando cache padrão.', error);
+  db = getFirestore(app);
+}
+
+export { db };
 export default app;

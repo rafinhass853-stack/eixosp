@@ -1,12 +1,12 @@
 // src/TicketLog.jsx
-import React, { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
 
 /**
  * Lista COMPLETA de campos do Ticket Log
  */
-export const CAMPOS_TICKETLOG = [
+const CAMPOS_TICKETLOG = [
   "Nome",
   "Matrícula",
   "Vencimento da CNH",

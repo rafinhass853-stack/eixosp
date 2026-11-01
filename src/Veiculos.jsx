@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
 
@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
  * Lista COMPLETA de campos conforme o cabeçalho do arquivo
  * idPlacaNº FrotaStatusModeloVersãoModelo.txt
  */
-export const CAMPOS_VEICULO = [
+const CAMPOS_VEICULO = [
   "id",
   "Placa",
   "Nº Frota",
@@ -371,7 +371,7 @@ export default function Veiculos() {
                     </td>
                   </tr>
                 )}
-                {listaFiltrada.map((v, i) => {
+                {listaFiltrada.map((v) => {
                   const idxReal = veiculos.indexOf(v);
                   return (
                     <tr key={idxReal}>

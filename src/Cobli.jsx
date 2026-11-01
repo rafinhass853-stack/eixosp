@@ -1,12 +1,12 @@
 // src/Cobli.jsx
-import React, { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
 
 /**
  * Lista COMPLETA de campos do Cobli
  */
-export const CAMPOS_COBLI = [
+const CAMPOS_COBLI = [
   "Nome",
   "Matrícula",
   "CPF",

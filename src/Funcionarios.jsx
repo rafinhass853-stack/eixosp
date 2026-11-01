@@ -1,5 +1,5 @@
 // src/Funcionarios.jsx
-import React, { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
 
@@ -7,7 +7,7 @@ import * as XLSX from "xlsx";
  * Lista COMPLETA de campos do cadastro de Funcionários
  * (conforme cabeçalho informado)
  */
-export const CAMPOS_FUNCIONARIO = [
+const CAMPOS_FUNCIONARIO = [
   "Status",
   "Matricula",
   "Nome",
