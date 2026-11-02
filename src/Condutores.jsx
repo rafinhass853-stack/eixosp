@@ -6,6 +6,7 @@ import {
   writeBatch, serverTimestamp, query, orderBy,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import PainelConferenciaIntegracoes from './PainelConferenciaIntegracoes';
 import {
   CAMPOS, CAMPOS_FORM, GRUPOS_CAMPOS,
   normalizarCPF, limparValor, labelDe, formatarCPF, parseData,
@@ -111,7 +112,7 @@ export default function Condutores() {
         </nav>
       </header>
 
-      <main className="p-6 max-w-7xl mx-auto">
+      <main className="p-6 max-w-7xl mx-auto">\n        {aba === "lista" && <PainelConferenciaIntegracoes modulo="condutores" />}
         {aba === 'lista' && (
           <ListaView
             condutores={filtrados}
