@@ -131,8 +131,8 @@ export default function Multas() {
     if (!veiculosSistema.some((v) => v.__placa === String(form["Placa"] || ""))) {
       setErro("Selecione um veículo cadastrado no menu Veículos para registrar esta multa."); return;
     }
-    if (form["Condutor identificado"] && !condutoresSistema.some((d) => d.__nome === String(form["Condutor identificado"]))) {
-      setErro("O condutor informado não foi encontrado no cadastro Condutores. Selecione um condutor cadastrado ou deixe em branco até identificá-lo."); return;
+    if (!form["Condutor identificado"] || !condutoresSistema.some((d) => d.__nome === String(form["Condutor identificado"]) && ((form["Matrícula do condutor"] && d.__matricula === String(form["Matrícula do condutor"])) || (form["CPF do condutor"] && d.__cpf === String(form["CPF do condutor"]))))) {
+      setErro("Selecione um condutor cadastrado no menu Condutores (NextFleet), com matrícula ou CPF identificado."); return;
     }
     const duplicado = registros.findIndex((r, i) => i !== editIndex && (
       (form.AIT && String(r.AIT || "").trim().toLowerCase() === String(form.AIT).trim().toLowerCase()) ||
@@ -216,13 +216,12 @@ export default function Multas() {
         <option value="">{cadastrosLoading ? "Carregando veículos..." : veiculosSistema.length ? "Selecione um veículo cadastrado..." : "Nenhum veículo cadastrado"}</option>
         {form[campo] && !veiculosSistema.some((v) => v.__placa === form[campo]) && <option value={form[campo]}>{form[campo]} — não localizado no cadastro</option>}
         {veiculosSistema.map((v) => <option key={v.__id} value={v.__placa}>{v.__placa}{v.__frota ? ` · Frota ${v.__frota}` : ""}{v.__modelo ? ` · ${v.__modelo}` : ""}</option>)}
-      </select> : campo === "Condutor identificado" ? <select value={form[campo] ?? ""} onChange={(e) => {
-        const nome = e.target.value;
-        const condutor = condutoresSistema.find((d) => d.__nome === nome);
-        setForm((f) => ({ ...f, "Condutor identificado": nome, "Matrícula do condutor": condutor?.__matricula || "", "CPF do condutor": condutor?.__cpf || "" }));
+      </select> : campo === "Condutor identificado" ? <select value={form["Matrícula do condutor"] || form["CPF do condutor"] || ""} onChange={(e) => {
+        const chave = e.target.value;
+        const condutor = condutoresSistema.find((d) => (d.__matricula || d.__cpf) === chave);
+        setForm((f) => ({ ...f, "Condutor identificado": condutor?.__nome || "", "Matrícula do condutor": condutor?.__matricula || "", "CPF do condutor": condutor?.__cpf || "" }));
       }} required disabled={cadastrosLoading || condutoresSistema.length === 0}>
-        <option value="">{cadastrosLoading ? "Carregando condutores..." : "Ainda não identificado"}</option>
-        {form[campo] && !condutoresSistema.some((d) => d.__nome === form[campo]) && <option value={form[campo]}>{form[campo]} — não localizado no cadastro</option>}
+        <option value="">{cadastrosLoading ? "Carregando condutores..." : "Selecione um condutor cadastrado..."}</option>
         {condutoresSistema.map((d) => <option key={d.__id} value={d.__matricula || d.__cpf}>{d.__nome}{d.__matricula ? ` · Matrícula ${d.__matricula}` : ` · CPF ${d.__cpf}`}</option>)}
       </select> : tipo === "select" ? <select value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} required={!!obrigatorio}>
         <option value="">Selecione...</option>{opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
