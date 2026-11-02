@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import {
   collection, doc, getDoc, getDocs, setDoc, deleteDoc,
-  writeBatch, serverTimestamp, query, orderBy,
+  writeBatch, serverTimestamp, query,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import PainelConferenciaIntegracoes from './PainelConferenciaIntegracoes';
@@ -41,9 +41,25 @@ export default function Condutores() {
     }
     setCarregando(true);
     try {
-      const q = query(collection(db, COL), orderBy('nome'));
-      const snap = await getDocs(q);
-      const rows = snap.docs.map((d) => ({ cpf: d.id, ...d.data() }));
+      // Não usar orderBy('nome'): documentos legados do NextFleet podem
+      // guardar o nome como "Nome" (maiúsculo) ou "Condutor". O orderBy
+      // excluiria silenciosamente todos os documentos sem o campo minúsculo.
+      const snap = await getDocs(collection(db, COL));
+      const rows = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          ...data,
+          cpf: data.cpf ?? data.CPF ?? d.id,
+          nome: data.nome ?? data.Nome ?? data.Condutor ?? '',
+          matricula: data.matricula ?? data['Matrícula'] ?? data['Matricula'] ?? '',
+          cargo: data.cargo ?? data.Cargo ?? '',
+          unidade: data.unidade ?? data.Unidade ?? '',
+          status: data.status ?? data.Status ?? '',
+          numeroCNH: data.numeroCNH ?? data['Número CNH'] ?? data['Numero CNH'] ?? '',
+          categoriaCNH: data.categoriaCNH ?? data['Categoria CNH'] ?? '',
+          validadeCNH: data.validadeCNH ?? data['Validade CNH'] ?? data['Data de Validade CNH'] ?? '',
+        };
+      }).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
       condutoresCache = { rows, updatedAt: Date.now() };
       setCondutores(rows);
     } catch (e) {
