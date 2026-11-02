@@ -2,6 +2,7 @@ import { Component, useMemo, useState } from 'react';
 import Condutores from './Condutores';
 import Veiculos from './Veiculos';
 import Funcionarios from './Funcionarios';
+import Locadoras from './Locadoras';
 import TicketLog from './TicketLog';
 import Cobli from './Cobli';
 import Multas from './Multas';
@@ -11,6 +12,7 @@ const MENU = [
   { key: 'funcionarios', label: 'Funcionários', desc: 'Base-mãe: cadastro oficial e dados completos dos colaboradores', icon: '🧑‍💼', componente: <Funcionarios />, group: 'Cadastros' },
   { key: 'condutores', label: 'Condutores', desc: 'Funcionários habilitados para conduzir no NextFleet', icon: '👤', componente: <Condutores />, group: 'Cadastros' },
   { key: 'veiculos', label: 'Veículos', desc: 'Cadastro completo da frota da empresa', icon: '🚘', componente: <Veiculos />, group: 'Cadastros' },
+  { key: 'locadoras', label: 'Locadoras', desc: 'Contratos e veículos de terceiros por locadora', icon: '🏢', componente: <Locadoras />, group: 'Cadastros', submenus: ['Movida', 'CCV', 'Naubrás', 'Emtel', 'Dinâmica'] },
   { key: 'ticketlog', label: 'Ticket Log', desc: 'Cadastros e pontos de conferência', icon: '🎫', componente: <TicketLog />, group: 'Operação' },
   { key: 'cobli', label: 'Cobli', desc: 'Registros e informações operacionais', icon: '📡', componente: <Cobli />, group: 'Operação' },
   { key: 'multas', label: 'Multas', desc: 'Infrações, prazos e acompanhamento', icon: '🚨', componente: <Multas />, group: 'Operação' },
@@ -59,6 +61,12 @@ export default function Menu() {
     setMenuAberto(false);
   }
 
+  function navegarLocadora(nome) {
+    setPagina('locadoras');
+    window.dispatchEvent(new CustomEvent('locadora-select', { detail: nome }));
+    setMenuAberto(false);
+  }
+
   return (
     <div className="app-shell">
       {menuAberto && <button className="sidebar-scrim" aria-label="Fechar menu" onClick={() => setMenuAberto(false)} />}
@@ -72,9 +80,14 @@ export default function Menu() {
         <nav className="primary-nav" aria-label="Navegação principal">
           {grupos.map((grupo) => <div className="nav-group" key={grupo.nome}>
             <p className="nav-group-title">{grupo.nome}</p>
-            {grupo.itens.map((item) => <button key={item.key} onClick={() => navegar(item.key)} className={`nav-link ${pagina === item.key ? 'active' : ''}`} aria-current={pagina === item.key ? 'page' : undefined}>
-              <span className="nav-icon">{item.icon}</span><span className="nav-label">{item.label}<small>{item.desc}</small></span>{pagina === item.key && <span className="nav-current" />}
-            </button>)}
+            {grupo.itens.map((item) => <div key={item.key} className="nav-item-wrap">
+              <button onClick={() => navegar(item.key)} className={`nav-link ${pagina === item.key ? 'active' : ''}`} aria-current={pagina === item.key ? 'page' : undefined}>
+                <span className="nav-icon">{item.icon}</span><span className="nav-label">{item.label}<small>{item.desc}</small></span>{pagina === item.key && <span className="nav-current" />}
+              </button>
+              {item.submenus && pagina === item.key && <div className="nav-submenu" aria-label={`Submenus de ${item.label}`}>
+                {item.submenus.map((submenu) => <button key={submenu} type="button" onClick={() => navegarLocadora(submenu)} className="nav-sublink">{submenu}</button>)}
+              </div>}
+            </div>)}
           </div>)}
           {grupos.length === 0 && <p className="nav-empty">Nenhum módulo encontrado.</p>}
         </nav>
