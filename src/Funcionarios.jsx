@@ -400,8 +400,8 @@ export default function Funcionarios() {
               <article key={f.__docId} className="border rounded-xl p-4 bg-white shadow-sm">
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-sm break-words">{f["Nome"] || "Nome não informado"}</h3>
-                    <p className="text-xs text-muted mt-1">Matrícula: {f["Matricula"] || "—"}</p>
+                    <h3 className="font-semibold text-sm break-words">{exibirValor(f["Nome"]) === "—" ? "Nome não informado" : exibirValor(f["Nome"])}</h3>
+                    <p className="text-xs text-muted mt-1">Matrícula: {exibirValor(f["Matricula"])}</p>
                   </div>
                   <span className="text-xs rounded-full px-2 py-1 bg-surface border shrink-0">{exibirValor(f["Status"]) === "—" ? "Sem status" : exibirValor(f["Status"])}</span>
                 </div>
