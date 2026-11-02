@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
 const { getFirestore } = require("firebase-admin/firestore");
 
 initializeApp();
@@ -9,42 +10,43 @@ exports.importVeiculos = require("./importVeiculos").importVeiculos;
 
 const normalizar = (valor) => String(valor ?? "").trim();
 
-exports.validarMatricula = onCall(
+exports.autenticarFuncionario = onCall(
   { region: "southamerica-east1", maxInstances: 10, enforceAppCheck: false },
   async (request) => {
-    const matriculaDigitada = normalizar(request.data?.matricula);
-    if (!/^\d{1,20}$/.test(matriculaDigitada)) {
-      throw new HttpsError("invalid-argument", "Informe uma matrícula numérica válida.");
+    const matricula = normalizar(request.data?.matricula);
+    const senha = normalizar(request.data?.senha);
+
+    if (!/^\d{1,20}$/.test(matricula) || !senha) {
+      throw new HttpsError("invalid-argument", "Informe matrícula e senha.");
     }
-    const matricula = String(Number(matriculaDigitada));
-    const matriculaArmazenada = matricula.padStart(6, "0");
 
-    // Não retorna o documento completo: apenas os campos mínimos para a tela de entrada.
-    // A matrícula não comprova a identidade do solicitante.
-    const snapshot = await db.collection("funcionarios")
-      .where("Matricula", "==", matriculaArmazenada)
-      .limit(1)
-      .get();
+    // Regra solicitada pelo projeto: a senha padrão e permanente é a própria matrícula.
+    if (senha !== matricula) {
+      throw new HttpsError("permission-denied", "Matrícula ou senha inválida.");
+    }
 
-    if (snapshot.empty) {
+    // A coleção existente no projeto é "funcionarios" e o ID do documento é a matrícula.
+    const snapshot = await db.collection("funcionarios").doc(matricula).get();
+    if (!snapshot.exists) {
       throw new HttpsError("not-found", "Matrícula não encontrada.");
     }
 
-    const funcionario = snapshot.docs[0].data();
-    const status = String(funcionario.Status ?? "").trim().toLowerCase();
-    const situacaoFolha = String(funcionario["Sit. Folha"] ?? "").trim().toLowerCase();
+    const funcionario = snapshot.data() || {};
+    const status = normalizar(funcionario.Status).toLowerCase();
+    const situacaoFolha = normalizar(funcionario["Sit. Folha"]).toLowerCase();
     const inativo = ["inativo", "desligado", "demitido", "cancelado"].includes(status)
       || ["inativo", "desligado", "demitido"].includes(situacaoFolha);
 
-    if (inativo) {
-      throw new HttpsError("not-found", "Matrícula não elegível para acesso.");
+    if (status !== "ativo" || inativo) {
+      throw new HttpsError("permission-denied", "Funcionário inativo ou sem autorização de acesso.");
     }
 
-    return {
+    const nome = normalizar(funcionario.Nome).slice(0, 120);
+    const customToken = await getAuth().createCustomToken(`funcionario_${matricula}`, {
       matricula,
-      nome: String(funcionario.Nome ?? "").slice(0, 120),
-      aviso: "Matrícula verificada; identidade não autenticada.",
-      acessoAdministrativo: false
-    };
+      nome,
+    });
+
+    return { customToken, matricula, nome };
   }
 );
