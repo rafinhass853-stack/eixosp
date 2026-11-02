@@ -343,7 +343,7 @@ export default function Funcionarios() {
         importados.slice(i, i + 400).forEach((row) => lote.set(doc(collection(db, "funcionarios")), row));
         await lote.commit();
       }
-      setErroImport(\`Importação analisada: \${importados.length} funcionário(s) novo(s), \${duplicados} duplicado(s) ignorado(s) e \${semIdentificador} linha(s) sem matrícula/CPF ignorada(s). Nenhum cadastro existente foi sobrescrito.\`);
+      setErroImport(`Importação analisada: ${importados.length} funcionário(s) novo(s), ${duplicados} duplicado(s) ignorado(s) e ${semIdentificador} linha(s) sem matrícula/CPF ignorada(s). Nenhum cadastro existente foi sobrescrito.`);
       setAba("importar");
       setPagina(0);
       setCursores([null]);
@@ -364,13 +364,13 @@ export default function Funcionarios() {
         <div>
           <h1 className="text-xl font-semibold">Funcionários</h1>
           <p className="text-sm text-muted mt-1">
-            {total == null ? "Carregamento sob demanda" : \`\${total.toLocaleString("pt-BR")} funcionários cadastrados\`} · exibindo até {TAMANHO_PAGINA} por página
+            {total == null ? "Carregamento sob demanda" : `${total.toLocaleString("pt-BR")} funcionários cadastrados`} · exibindo até {TAMANHO_PAGINA} por página
           </p>
         </div>
         <nav className="flex flex-wrap gap-2">
-          <button onClick={() => setAba("lista")} className={\`px-3 py-1.5 rounded-md text-sm border \${aba === "lista" ? "bg-brand-600 text-white border-brand-600" : "bg-white hover:bg-surface"}\`}>Lista</button>
+          <button onClick={() => setAba("lista")} className={`px-3 py-1.5 rounded-md text-sm border ${aba === "lista" ? "bg-brand-600 text-white border-brand-600" : "bg-white hover:bg-surface"}`}>Lista</button>
           <button onClick={novo} className="px-3 py-1.5 rounded-md text-sm bg-brand-600 text-white">Novo Funcionário</button>
-          <button onClick={() => setAba("importar")} className={\`px-3 py-1.5 rounded-md text-sm border \${aba === "importar" ? "bg-brand-600 text-white border-brand-600" : "bg-white hover:bg-surface"}\`}>Importar Planilha</button>
+          <button onClick={() => setAba("importar")} className={`px-3 py-1.5 rounded-md text-sm border ${aba === "importar" ? "bg-brand-600 text-white border-brand-600" : "bg-white hover:bg-surface"}`}>Importar Planilha</button>
         </nav>
       </div>
 
@@ -422,9 +422,9 @@ export default function Funcionarios() {
 
           <div className="flex flex-wrap items-center justify-between gap-3 mt-5">
             <p className="text-xs text-muted">
-              {busca.trim()
-                ? \`Resultados desta pesquisa: \${funcionarios.length} (limite de \${TAMANHO_PAGINA})\`
-                : \`Página \${pagina + 1}\${totalPaginas ? \` de \${totalPaginas}\` : ""} · \${funcionarios.length} funcionário(s) carregado(s)\`}
+              {buscaAplicada.trim()
+                ? `Resultados desta pesquisa: ${funcionarios.length} (limite de ${TAMANHO_PAGINA})`
+                : `Página ${pagina + 1}${totalPaginas ? ` de ${totalPaginas}` : ""} · ${funcionarios.length} funcionário(s) carregado(s)`}
             </p>
             {!buscaAplicada.trim() && (
               <div className="flex gap-2">
@@ -441,7 +441,7 @@ export default function Funcionarios() {
           <h2 className="text-lg font-semibold mb-3">{editando ? "Editar funcionário" : "Novo funcionário"}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {CAMPOS_FUNCIONARIO.map((campo, indice) => (
-              <label key={\`\${campo}-\${indice}\`} className="flex flex-col text-sm">
+              <label key={`${campo}-${indice}`} className="flex flex-col text-sm">
                 <span className="text-xs text-muted mb-1">{campo}</span>
                 <input value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} className="px-2 py-1.5 border rounded-md" />
               </label>
@@ -467,7 +467,7 @@ export default function Funcionarios() {
           {erroImport && <p className="text-sm text-brand-700">{erroImport}</p>}
           <details className="text-sm mt-3">
             <summary className="cursor-pointer">Campos esperados ({CAMPOS_FUNCIONARIO.length})</summary>
-            <ul className="columns-2 md:columns-3 gap-6 text-xs mt-2 max-h-60 overflow-auto">{CAMPOS_FUNCIONARIO.map((c, i) => <li key={\`\${c}-\${i}\`}>{c}</li>)}</ul>
+            <ul className="columns-2 md:columns-3 gap-6 text-xs mt-2 max-h-60 overflow-auto">{CAMPOS_FUNCIONARIO.map((c, i) => <li key={`${c}-${i}`}>{c}</li>)}</ul>
           </details>
         </section>
       )}
