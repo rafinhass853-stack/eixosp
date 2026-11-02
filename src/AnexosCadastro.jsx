@@ -81,7 +81,7 @@ export default function AnexosCadastro({ collectionName, recordId, anexos = [], 
     if (!ok) return;
     try {
       if (anexo.caminho) await deleteObject(ref(getStorage(), anexo.caminho));
-      onChange((Array.isArray(anexos) ? anexos : []).filter((item) => item.caminho !== anexo.caminho || item.url !== anexo.url));
+      onChange((Array.isArray(anexos) ? anexos : []).filter((item) => !(item.caminho === anexo.caminho && item.url === anexo.url)));
     } catch (error) {
       console.error('Falha ao remover anexo:', error);
       setErro('Não foi possível excluir o arquivo do Storage. Verifique as permissões.');
