@@ -127,6 +127,7 @@ export default function Funcionarios() {
   const [editando, setEditando] = useState(null);
   const [aba, setAba] = useState("lista");
   const [busca, setBusca] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
   const [erroImport, setErroImport] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [erroCarga, setErroCarga] = useState("");
@@ -134,10 +135,11 @@ export default function Funcionarios() {
   const [pagina, setPagina] = useState(0);
   const [cursores, setCursores] = useState([null]);
   const [ultimoDoc, setUltimoDoc] = useState(null);
+  const [temProxima, setTemProxima] = useState(false);
   const fileRef = useRef(null);
   const TAMANHO_PAGINA = 50;
 
-  async function carregarPagina(cursor = null, termo = busca) {
+  async function carregarPagina(cursor = null, termo = buscaAplicada) {
     setCarregando(true);
     setErroCarga("");
     try {
@@ -152,19 +154,21 @@ export default function Funcionarios() {
           orderBy(campo),
           where(campo, ">=", q),
           where(campo, "<=", q + "\uf8ff"),
-          limit(TAMANHO_PAGINA)
+          limit(TAMANHO_PAGINA + 1)
         );
       } else {
         consulta = query(
           ref,
           orderBy(documentId()),
           ...(cursor ? [startAfter(cursor)] : []),
-          limit(TAMANHO_PAGINA)
+          limit(TAMANHO_PAGINA + 1)
         );
       }
       const snap = await getDocs(consulta);
-      setFuncionarios(snap.docs.map((item) => ({ __docId: item.id, ...item.data() })));
-      setUltimoDoc(snap.docs.length ? snap.docs[snap.docs.length - 1] : null);
+      const docsVisiveis = snap.docs.slice(0, TAMANHO_PAGINA);
+      setFuncionarios(docsVisiveis.map((item) => ({ __docId: item.id, ...item.data() })));
+      setUltimoDoc(docsVisiveis.length ? docsVisiveis[docsVisiveis.length - 1] : null);
+      setTemProxima(snap.docs.length > TAMANHO_PAGINA);
       if (!q && total === null) {
         try {
           const contagem = await getCountFromServer(ref);
@@ -189,15 +193,16 @@ export default function Funcionarios() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function pesquisar(valor) {
-    setBusca(valor);
+  function pesquisar() {
+    const termo = busca.trim();
+    setBuscaAplicada(termo);
     setPagina(0);
     setCursores([null]);
-    void carregarPagina(null, valor);
+    void carregarPagina(null, termo);
   }
 
   function proximaPagina() {
-    if (!ultimoDoc || carregando || busca.trim()) return;
+    if (!ultimoDoc || carregando || buscaAplicada.trim() || !temProxima) return;
     const novosCursores = [...cursores.slice(0, pagina + 1), ultimoDoc];
     setCursores(novosCursores);
     setPagina(pagina + 1);
@@ -248,7 +253,7 @@ export default function Funcionarios() {
       setAba("lista");
       setPagina(0);
       setCursores([null]);
-      await carregarPagina(null, busca);
+      await carregarPagina(null, buscaAplicada);
     } catch (error) {
       console.error("Erro ao salvar funcionário:", error);
       alert("Não foi possível salvar o funcionário. Tente novamente.");
@@ -375,11 +380,12 @@ export default function Funcionarios() {
             <input
               placeholder="Pesquisar por nome, matrícula ou CPF (início do texto)"
               value={busca}
-              onChange={(e) => pesquisar(e.target.value)}
+              onChange={(e) => setBusca(e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md text-sm"
             />
+            <button onClick={pesquisar} className="px-3 py-2 text-sm bg-brand-600 text-white rounded-md">Pesquisar</button>
             <button onClick={baixarModelo} className="px-3 py-2 text-sm border rounded-md bg-white hover:bg-surface">Baixar modelo</button>
-            <button onClick={() => { setBusca(""); setPagina(0); setCursores([null]); void carregarPagina(null, ""); }} className="px-3 py-2 text-sm border rounded-md bg-white hover:bg-surface">Limpar busca</button>
+            <button onClick={() => { setBusca(""); setBuscaAplicada(""); setPagina(0); setCursores([null]); void carregarPagina(null, ""); }} className="px-3 py-2 text-sm border rounded-md bg-white hover:bg-surface">Limpar busca</button>
           </div>
 
           {erroCarga && <p className="text-sm text-red-600 mb-3">{erroCarga}</p>}
@@ -420,10 +426,10 @@ export default function Funcionarios() {
                 ? \`Resultados desta pesquisa: \${funcionarios.length} (limite de \${TAMANHO_PAGINA})\`
                 : \`Página \${pagina + 1}\${totalPaginas ? \` de \${totalPaginas}\` : ""} · \${funcionarios.length} funcionário(s) carregado(s)\`}
             </p>
-            {!busca.trim() && (
+            {!buscaAplicada.trim() && (
               <div className="flex gap-2">
                 <button disabled={pagina === 0 || carregando} onClick={paginaAnterior} className="px-3 py-2 text-sm border rounded-md disabled:opacity-40">Anterior</button>
-                <button disabled={!ultimoDoc || funcionarios.length < TAMANHO_PAGINA || carregando} onClick={proximaPagina} className="px-3 py-2 text-sm border rounded-md disabled:opacity-40">Próxima</button>
+                <button disabled={!ultimoDoc || !temProxima || carregando} onClick={proximaPagina} className="px-3 py-2 text-sm border rounded-md disabled:opacity-40">Próxima</button>
               </div>
             )}
           </div>
