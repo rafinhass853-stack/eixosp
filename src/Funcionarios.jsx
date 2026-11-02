@@ -220,7 +220,7 @@ export default function Funcionarios() {
         mapaCabecalho.set(normaliza(origem).toLowerCase(), destino);
       });
 
-      const importados = dados.map((linha) => {
+      const candidatos = dados.map((linha) => {
         const obj = vazio();
         Object.entries(linha).forEach(([k, v]) => {
           const campo = mapaCabecalho.get(normaliza(k).toLowerCase());
@@ -231,8 +231,26 @@ export default function Funcionarios() {
         return obj;
       });
 
-      setFuncionarios((atual) => [...atual, ...importados]);
-      setAba("lista");
+      const chavesDe = (row) => {
+        const matricula = String(row["Matricula"] || "").trim().toLowerCase();
+        const cpf = String(row["CPF"] || "").replace(/\D/g, "");
+        return [matricula ? "m:" + matricula : "", cpf ? "c:" + cpf : ""].filter(Boolean);
+      };
+      const existentes = new Set(funcionarios.flatMap(chavesDe));
+      const importados = [];
+      let duplicados = 0;
+      let semIdentificador = 0;
+      candidatos.forEach((row) => {
+        const chaves = chavesDe(row);
+        if (!chaves.length) { semIdentificador++; return; }
+        if (chaves.some((chave) => existentes.has(chave))) { duplicados++; return; }
+        importados.push(row);
+        chaves.forEach((chave) => existentes.add(chave));
+      });
+
+      if (importados.length) setFuncionarios((atual) => [...atual, ...importados]);
+      setErroImport(`Importação analisada: ${importados.length} funcionário(s) novo(s), ${duplicados} duplicado(s) ignorado(s) e ${semIdentificador} linha(s) sem matrícula/CPF ignorada(s). Nenhum cadastro existente foi sobrescrito. Clique em Lista para conferir.`);
+      setAba("importar");
     } catch (err) {
       console.error(err);
       setErroImport("Falha ao ler arquivo. Use .xlsx, .xls ou .csv.");
