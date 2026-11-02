@@ -1,6 +1,11 @@
 // src/App.jsx
 import Menu from './Menu';
+import AcessoMatricula from './AcessoMatricula';
 
 export default function App() {
-  return <Menu />;
+  return (
+    <AcessoMatricula>
+      <Menu />
+    </AcessoMatricula>
+  );
 }
