@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { collection, deleteDoc, doc, documentId, getCountFromServer, getDocs, limit, orderBy, query, setDoc, startAfter, where, writeBatch } from "firebase/firestore";
 import { db } from "./firebase";
 import * as XLSX from "xlsx";
+import AnexosCadastro from "./AnexosCadastro";
 
 /**
  * Lista COMPLETA de campos do cadastro de Funcionários
@@ -447,6 +448,7 @@ export default function Funcionarios() {
               </label>
             ))}
           </div>
+          <AnexosCadastro collectionName="funcionarios" recordId={form.__docId || form["Matricula"] || form["CPF"] || form["Nome"]} anexos={form.Anexos || []} onChange={(anexos) => onChange("Anexos", anexos)} />
           <div className="mt-4 flex gap-2">
             <button type="submit" disabled={carregando} className="px-3 py-1.5 rounded-md text-sm bg-brand-600 text-white disabled:opacity-50">Salvar</button>
             <button type="button" onClick={() => { setAba("lista"); setEditando(null); }} className="px-3 py-1.5 rounded-md text-sm border bg-white hover:bg-surface">Cancelar</button>
