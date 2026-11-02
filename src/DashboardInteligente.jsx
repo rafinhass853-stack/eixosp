@@ -31,15 +31,22 @@ function summarize(rows, key) {
   const statusKeys = ['status', 'Status', 'Status do Processo', 'Status Condutor', 'Status Veículo', 'Status Motorista', 'status no cadastro'];
   const cnhKeys = ['Validade CNH', 'Data de Validade CNH', 'validadeCNH', 'Validade da CNH', 'Vencimento da CNH'];
   const statusOf = (row) => norm(first(row, statusKeys));
+  const classificarStatus = (row) => {
+    const status = statusOf(row).replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!status) return 'sem-status';
+
+    // Verificar inatividade primeiro: "inativo" contém a sequência "ativo".
+    // Sem esta prioridade, o mesmo funcionário entrava nas duas contagens.
+    if (/(^| )(inativ[oa]s?|desativad[oa]s?|demitid[oa]s?|desligad[oa]s?|rescindid[oa]s?)( |$)/.test(status)) {
+      return 'inativo';
+    }
+    if (/(^| )(nao (esta )?)ativ[oa]s?( |$)/.test(status)) return 'inativo';
+    if (/(^| )(ativ[oa]s?|regular|em andamento)( |$)/.test(status)) return 'ativo';
+    return 'outro';
+  };
   const total = rows.length;
-  const ativos = rows.filter((row) => {
-    const s = statusOf(row);
-    return s.includes('ativo') || s === 'regular' || s === 'em andamento';
-  }).length;
-  const inativos = rows.filter((row) => {
-    const s = statusOf(row);
-    return s.includes('inativo') || s.includes('desativado') || s.includes('demitido');
-  }).length;
+  const ativos = rows.filter((row) => classificarStatus(row) === 'ativo').length;
+  const inativos = rows.filter((row) => classificarStatus(row) === 'inativo').length;
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const cnh = rows.filter((row) => {
     const value = first(row, cnhKeys);
