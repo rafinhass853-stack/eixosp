@@ -13,15 +13,20 @@ const normalizar = (valor) => String(valor ?? "").trim();
 exports.autenticarFuncionario = onCall(
   { region: "southamerica-east1", maxInstances: 10, enforceAppCheck: false },
   async (request) => {
-    const matricula = normalizar(request.data?.matricula);
+    const matriculaInformada = normalizar(request.data?.matricula);
     const senha = normalizar(request.data?.senha);
+
+    // A base utiliza matrículas com seis dígitos (ex.: 000001).
+    const matricula = /^\d{1,6}$/.test(matriculaInformada)
+      ? matriculaInformada.padStart(6, "0")
+      : matriculaInformada;
 
     if (!/^\d{1,20}$/.test(matricula) || !senha) {
       throw new HttpsError("invalid-argument", "Informe matrícula e senha.");
     }
 
     // Regra solicitada pelo projeto: a senha padrão e permanente é a própria matrícula.
-    if (senha !== matricula) {
+    if (senha !== matriculaInformada && senha !== matricula) {
       throw new HttpsError("permission-denied", "Matrícula ou senha inválida.");
     }
 
