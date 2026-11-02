@@ -319,14 +319,17 @@ export default function Veiculos() {
       });
 
       setVeiculos((atual) => {
-        const chaves = new Set(atual.map((item) => String(item["Placa"] || '').trim().toLocaleLowerCase('pt-BR') || String(item["Nº Frota"] || '').trim().toLocaleLowerCase('pt-BR')).filter(Boolean));
+        const chaves = new Set(atual.flatMap((item) => [String(item["Placa"] || '').trim().toLocaleLowerCase('pt-BR'), String(item["Nº Frota"] || '').trim().toLocaleLowerCase('pt-BR')]).filter(Boolean));
         const novos = [];
         importados.forEach((row) => {
-          const chave = String(row["Placa"] || '').trim().toLocaleLowerCase('pt-BR') || String(row["Nº Frota"] || '').trim().toLocaleLowerCase('pt-BR');
-          if (!chave || chaves.has(chave)) return;
-          chaves.add(chave);
+          const identificadores = [String(row["Placa"] || '').trim().toLocaleLowerCase('pt-BR'), String(row["Nº Frota"] || '').trim().toLocaleLowerCase('pt-BR')].filter(Boolean);
+          if (!identificadores.length || identificadores.some((chave) => chaves.has(chave))) return;
+          identificadores.forEach((chave) => chaves.add(chave));
           novos.push(row);
         });
+        if (novos.length !== importados.length) setErroImport(`Importação: ${novos.length} registro(s) novo(s); ${importados.length - novos.length} duplicado(s) ignorado(s). Nenhum cadastro existente foi sobrescrito.`);
+        return [...atual, ...novos];
+      });
         if (novos.length !== importados.length) setErroImport(`Importação: ${novos.length} registro(s) novo(s); ${importados.length - novos.length} duplicado(s) ignorado(s). Nenhum cadastro existente foi sobrescrito.`);
         return [...atual, ...novos];
       });
