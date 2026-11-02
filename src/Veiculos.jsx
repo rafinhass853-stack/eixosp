@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import AnexosCadastro from "./AnexosCadastro";
 import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
 
@@ -317,7 +318,18 @@ export default function Veiculos() {
         return obj;
       });
 
-      setVeiculos((atual) => [...atual, ...importados]);
+      setVeiculos((atual) => {
+        const chaves = new Set(atual.flatMap((item) => [String(item["Placa"] || '').trim().toLocaleLowerCase('pt-BR'), String(item["Nº Frota"] || '').trim().toLocaleLowerCase('pt-BR')]).filter(Boolean));
+        const novos = [];
+        importados.forEach((row) => {
+          const identificadores = [String(row["Placa"] || '').trim().toLocaleLowerCase('pt-BR'), String(row["Nº Frota"] || '').trim().toLocaleLowerCase('pt-BR')].filter(Boolean);
+          if (!identificadores.length || identificadores.some((chave) => chaves.has(chave))) return;
+          identificadores.forEach((chave) => chaves.add(chave));
+          novos.push(row);
+        });
+        if (novos.length !== importados.length) setErroImport(`Importação: ${novos.length} registro(s) novo(s); ${importados.length - novos.length} duplicado(s) ignorado(s). Nenhum cadastro existente foi sobrescrito.`);
+        return [...atual, ...novos];
+      });
       setAba("lista");
     } catch (err) {
       console.error(err);
@@ -414,6 +426,8 @@ export default function Veiculos() {
               </label>
             ))}
           </div>
+
+          <AnexosCadastro collectionName="veiculos" recordId={form.__docId || form["Placa"] || form["Nº Frota"]} anexos={form.Anexos || []} onChange={(anexos) => onChange("Anexos", anexos)} />
 
           <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
             <button type="submit">Salvar</button>

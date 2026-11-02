@@ -1,4 +1,5 @@
 // src/TicketLog.jsx
+import AnexosCadastro from "./AnexosCadastro";
 import { useMemo, useRef, useState } from "react";
 import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
@@ -131,7 +132,18 @@ export default function TicketLog() {
         return obj;
       });
 
-      setRegistros((atual) => [...atual, ...importados]);
+      setRegistros((atual) => {
+        const chaves = new Set(atual.flatMap((item) => [String(item["Matrícula"] || '').trim().toLocaleLowerCase('pt-BR'), String(item["Nome"] || '').trim().toLocaleLowerCase('pt-BR')]).filter(Boolean));
+        const novos = [];
+        importados.forEach((row) => {
+          const identificadores = [String(row["Matrícula"] || '').trim().toLocaleLowerCase('pt-BR'), String(row["Nome"] || '').trim().toLocaleLowerCase('pt-BR')].filter(Boolean);
+          if (!identificadores.length || identificadores.some((chave) => chaves.has(chave))) return;
+          identificadores.forEach((chave) => chaves.add(chave));
+          novos.push(row);
+        });
+        if (novos.length !== importados.length) setErroImport(`Importação: ${novos.length} registro(s) novo(s); ${importados.length - novos.length} duplicado(s) ignorado(s). Nenhum cadastro existente foi sobrescrito.`);
+        return [...atual, ...novos];
+      });
       setAba("lista");
     } catch (err) {
       console.error(err);
@@ -268,6 +280,8 @@ export default function TicketLog() {
               </label>
             ))}
           </div>
+
+          <AnexosCadastro collectionName="ticketlog" recordId={form.__docId || form["Matrícula"] || form["Nome"]} anexos={form.Anexos || []} onChange={(anexos) => onChange("Anexos", anexos)} />
 
           <div className="mt-4 flex gap-2">
             <button

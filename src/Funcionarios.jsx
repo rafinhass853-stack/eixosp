@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { collection, deleteDoc, doc, documentId, getCountFromServer, getDocs, limit, orderBy, query, setDoc, startAfter, where, writeBatch } from "firebase/firestore";
 import { db } from "./firebase";
 import * as XLSX from "xlsx";
+import AnexosCadastro from "./AnexosCadastro";
 
 /**
  * Lista COMPLETA de campos do cadastro de Funcionários
@@ -92,21 +93,6 @@ const CAMPOS_FUNCIONARIO = [
   "Cod.Unico",
 ];
 
-/** campos exibidos na tabela por padrão */
-const CAMPOS_TABELA = [
-  "Matricula",
-  "Nome",
-  "Status",
-  "Data Admissao",
-  "Funcao Descricao",
-  "Nome Departamento",
-  "Gestor",
-  "CPF",
-  "Municipio de Trabalho",
-  "Sit. Folha",
-];
-const MAX_LINHAS_RENDERIZADAS = 100;
-
 /**
  * Trata o cabeçalho duplicado "Nome" (aparece 2x no arquivo original).
  * Na importação, o segundo "Nome" é remapeado para "Nome_2",
@@ -120,6 +106,44 @@ const ALIAS_IMPORTACAO = {
 
 const vazio = () =>
   CAMPOS_FUNCIONARIO.reduce((acc, c) => ({ ...acc, [c]: "" }), {});
+
+function exibirValor(valor) {
+  if (valor == null || valor === "") return "—";
+  if (valor instanceof Date) return valor.toLocaleDateString("pt-BR");
+  if (typeof valor?.toDate === "function") {
+    const data = valor.toDate();
+    return Number.isNaN(data.getTime()) ? "—" : data.toLocaleDateString("pt-BR");
+  }
+  if (typeof valor === "object" && Number.isFinite(valor.seconds)) {
+    const data = new Date(valor.seconds * 1000);
+    return Number.isNaN(data.getTime()) ? "—" : data.toLocaleDateString("pt-BR");
+  }
+  if (typeof valor === "object") return JSON.stringify(valor);
+  return String(valor);
+}
+
+// Firestore pode devolver Timestamp em qualquer campo do documento,
+// inclusive campos que não aparecem no cartão (formulário e anexos).
+// Normalize o documento inteiro antes de entregá-lo ao React.
+function normalizarDadosFirestore(valor) {
+  if (valor == null) return valor;
+  if (valor instanceof Date) return valor.toLocaleDateString("pt-BR");
+  if (typeof valor?.toDate === "function") {
+    const data = valor.toDate();
+    return Number.isNaN(data.getTime()) ? "" : data.toLocaleDateString("pt-BR");
+  }
+  if (typeof valor === "object" && Number.isFinite(valor.seconds)) {
+    const data = new Date(valor.seconds * 1000);
+    return Number.isNaN(data.getTime()) ? "" : data.toLocaleDateString("pt-BR");
+  }
+  if (Array.isArray(valor)) return valor.map(normalizarDadosFirestore);
+  if (typeof valor === "object") {
+    return Object.fromEntries(
+      Object.entries(valor).map(([chave, item]) => [chave, normalizarDadosFirestore(item)])
+    );
+  }
+  return valor;
+}
 
 export default function Funcionarios() {
   const [form, setForm] = useState(vazio());
@@ -166,7 +190,10 @@ export default function Funcionarios() {
       }
       const snap = await getDocs(consulta);
       const docsVisiveis = snap.docs.slice(0, TAMANHO_PAGINA);
-      setFuncionarios(docsVisiveis.map((item) => ({ __docId: item.id, ...item.data() })));
+      setFuncionarios(docsVisiveis.map((item) => ({
+        __docId: item.id,
+        ...normalizarDadosFirestore(item.data()),
+      })));
       setUltimoDoc(docsVisiveis.length ? docsVisiveis[docsVisiveis.length - 1] : null);
       setTemProxima(snap.docs.length > TAMANHO_PAGINA);
       if (!q && total === null) {
@@ -399,18 +426,18 @@ export default function Funcionarios() {
               <article key={f.__docId} className="border rounded-xl p-4 bg-white shadow-sm">
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-sm break-words">{f["Nome"] || "Nome não informado"}</h3>
-                    <p className="text-xs text-muted mt-1">Matrícula: {f["Matricula"] || "—"}</p>
+                    <h3 className="font-semibold text-sm break-words">{exibirValor(f["Nome"]) === "—" ? "Nome não informado" : exibirValor(f["Nome"])}</h3>
+                    <p className="text-xs text-muted mt-1">Matrícula: {exibirValor(f["Matricula"])}</p>
                   </div>
-                  <span className="text-xs rounded-full px-2 py-1 bg-surface border shrink-0">{f["Status"] || "Sem status"}</span>
+                  <span className="text-xs rounded-full px-2 py-1 bg-surface border shrink-0">{exibirValor(f["Status"]) === "—" ? "Sem status" : exibirValor(f["Status"])}</span>
                 </div>
                 <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                  <div><dt className="text-muted">Função</dt><dd className="font-medium break-words">{f["Funcao Descricao"] || "—"}</dd></div>
-                  <div><dt className="text-muted">Departamento</dt><dd className="font-medium break-words">{f["Nome Departamento"] || "—"}</dd></div>
-                  <div><dt className="text-muted">Gestor</dt><dd className="font-medium break-words">{f["Gestor"] || "—"}</dd></div>
-                  <div><dt className="text-muted">CPF</dt><dd className="font-medium">{f["CPF"] || "—"}</dd></div>
-                  <div><dt className="text-muted">Admissão</dt><dd className="font-medium">{f["Data Admissao"] || "—"}</dd></div>
-                  <div><dt className="text-muted">Município</dt><dd className="font-medium break-words">{f["Municipio de Trabalho"] || "—"}</dd></div>
+                  <div><dt className="text-muted">Função</dt><dd className="font-medium break-words">{exibirValor(f["Funcao Descricao"])}</dd></div>
+                  <div><dt className="text-muted">Departamento</dt><dd className="font-medium break-words">{exibirValor(f["Nome Departamento"])}</dd></div>
+                  <div><dt className="text-muted">Gestor</dt><dd className="font-medium break-words">{exibirValor(f["Gestor"])}</dd></div>
+                  <div><dt className="text-muted">CPF</dt><dd className="font-medium">{exibirValor(f["CPF"])}</dd></div>
+                  <div><dt className="text-muted">Admissão</dt><dd className="font-medium">{exibirValor(f["Data Admissao"])}</dd></div>
+                  <div><dt className="text-muted">Município</dt><dd className="font-medium break-words">{exibirValor(f["Municipio de Trabalho"])}</dd></div>
                 </dl>
                 <div className="flex gap-3 border-t mt-4 pt-3 text-sm">
                   <button onClick={() => editar(f)} className="text-brand-700 hover:underline">Editar</button>
@@ -447,6 +474,7 @@ export default function Funcionarios() {
               </label>
             ))}
           </div>
+          <AnexosCadastro collectionName="funcionarios" recordId={form.__docId || form["Matricula"] || form["CPF"] || form["Nome"]} anexos={form.Anexos || []} onChange={(anexos) => onChange("Anexos", anexos)} />
           <div className="mt-4 flex gap-2">
             <button type="submit" disabled={carregando} className="px-3 py-1.5 rounded-md text-sm bg-brand-600 text-white disabled:opacity-50">Salvar</button>
             <button type="button" onClick={() => { setAba("lista"); setEditando(null); }} className="px-3 py-1.5 rounded-md text-sm border bg-white hover:bg-surface">Cancelar</button>

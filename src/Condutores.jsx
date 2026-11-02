@@ -3,10 +3,11 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import {
   collection, doc, getDoc, getDocs, setDoc, deleteDoc,
-  writeBatch, serverTimestamp, query, orderBy,
+  writeBatch, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import PainelConferenciaIntegracoes from './PainelConferenciaIntegracoes';
+import AnexosCadastro from './AnexosCadastro';
 import {
   CAMPOS, CAMPOS_FORM, GRUPOS_CAMPOS,
   normalizarCPF, limparValor, labelDe, formatarCPF, parseData,
@@ -40,9 +41,25 @@ export default function Condutores() {
     }
     setCarregando(true);
     try {
-      const q = query(collection(db, COL), orderBy('nome'));
-      const snap = await getDocs(q);
-      const rows = snap.docs.map((d) => ({ cpf: d.id, ...d.data() }));
+      // Não usar orderBy('nome'): documentos legados do NextFleet podem
+      // guardar o nome como "Nome" (maiúsculo) ou "Condutor". O orderBy
+      // excluiria silenciosamente todos os documentos sem o campo minúsculo.
+      const snap = await getDocs(collection(db, COL));
+      const rows = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          ...data,
+          cpf: data.cpf ?? data.CPF ?? d.id,
+          nome: data.nome ?? data.Nome ?? data.Condutor ?? '',
+          matricula: data.matricula ?? data['Matrícula'] ?? data['Matricula'] ?? '',
+          cargo: data.cargo ?? data.Cargo ?? '',
+          unidade: data.unidade ?? data.Unidade ?? '',
+          status: data.status ?? data.Status ?? '',
+          numeroCNH: data.numeroCNH ?? data['Número CNH'] ?? data['Numero CNH'] ?? '',
+          categoriaCNH: data.categoriaCNH ?? data['Categoria CNH'] ?? '',
+          validadeCNH: data.validadeCNH ?? data['Validade CNH'] ?? data['Data de Validade CNH'] ?? '',
+        };
+      }).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
       condutoresCache = { rows, updatedAt: Date.now() };
       setCondutores(rows);
     } catch (e) {
@@ -368,6 +385,8 @@ function NovoView({ onSalvo, notificar }) {
         ))}
       </div>
 
+      <AnexosCadastro collectionName={COL} recordId={form.cpf || form.matricula || form.nome} anexos={form.Anexos || []} onChange={(anexos) => setForm((current) => ({ ...current, Anexos: anexos }))} />
+
       <div className="mt-6 flex gap-3">
         <button
           type="submit"
@@ -659,6 +678,7 @@ function Drawer({ modo, dados, onFechar, onSalvo, notificar }) {
               </div>
             </section>
           ))}
+          {editando && <AnexosCadastro collectionName={COL} recordId={form.cpf || dados.cpf || form.matricula || form.nome} anexos={form.Anexos || dados.Anexos || []} onChange={(anexos) => setForm((current) => ({ ...current, Anexos: anexos }))} />}
         </div>
 
         <footer className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">

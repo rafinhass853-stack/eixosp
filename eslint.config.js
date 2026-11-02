@@ -18,4 +18,14 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    files: ['functions/**/*.js'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    // Os módulos existentes usam efeitos assíncronos para sincronizar dados do Firestore.
+    // A regra nova do React 19 sinaliza inclusive a inicialização do estado desses fluxos.
+    files: ['src/**/*.{js,jsx}'],
+    rules: { 'react-hooks/set-state-in-effect': 'off' },
+  },
 ])
