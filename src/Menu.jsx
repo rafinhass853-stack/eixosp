@@ -8,9 +8,9 @@ import Multas from './Multas';
 import DashboardInteligente from './DashboardInteligente';
 
 const MENU = [
-  { key: 'condutores', label: 'Condutores', desc: 'Cadastro, habilitações e qualidade dos dados', icon: '👤', componente: <Condutores />, group: 'Cadastros' },
-  { key: 'veiculos', label: 'Veículos', desc: 'Frota, disponibilidade e dados operacionais', icon: '🚘', componente: <Veiculos />, group: 'Cadastros' },
-  { key: 'funcionarios', label: 'Funcionários', desc: 'Pessoas, vínculos e estrutura', icon: '🧑‍💼', componente: <Funcionarios />, group: 'Cadastros' },
+  { key: 'funcionarios', label: 'Funcionários', desc: 'Base-mãe: cadastro oficial e dados completos dos colaboradores', icon: '🧑‍💼', componente: <Funcionarios />, group: 'Cadastros' },
+  { key: 'condutores', label: 'Condutores', desc: 'Funcionários habilitados para conduzir no NextFleet', icon: '👤', componente: <Condutores />, group: 'Cadastros' },
+  { key: 'veiculos', label: 'Veículos', desc: 'Cadastro completo da frota da empresa', icon: '🚘', componente: <Veiculos />, group: 'Cadastros' },
   { key: 'ticketlog', label: 'Ticket Log', desc: 'Cadastros e pontos de conferência', icon: '🎫', componente: <TicketLog />, group: 'Operação' },
   { key: 'cobli', label: 'Cobli', desc: 'Registros e informações operacionais', icon: '📡', componente: <Cobli />, group: 'Operação' },
   { key: 'multas', label: 'Multas', desc: 'Infrações, prazos e acompanhamento', icon: '🚨', componente: <Multas />, group: 'Operação' },
@@ -42,7 +42,7 @@ class ModuleErrorBoundary extends Component {
 }
 
 export default function Menu() {
-  const [pagina, setPagina] = useState('condutores');
+  const [pagina, setPagina] = useState('funcionarios');
   const [menuAberto, setMenuAberto] = useState(false);
   const [buscaMenu, setBuscaMenu] = useState('');
   const itemAtual = MENU.find((m) => m.key === pagina) || MENU[0];
