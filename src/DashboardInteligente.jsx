@@ -8,12 +8,25 @@ const MODULOS = {
   condutores: { collection: 'condutores', title: 'Visão dos condutores', description: 'Acompanhe cadastro, habilitação e qualidade dos dados.', icon: '👤', metrics: [['Total cadastrado', 'total'], ['Ativos', 'ativos'], ['CNH a verificar', 'cnh'], ['Dados incompletos', 'incompletos']] },
   veiculos: { collection: 'veiculos', title: 'Visão da frota', description: 'Entenda a composição da frota e identifique itens que precisam de atenção.', icon: '🚘', metrics: [['Veículos cadastrados', 'total'], ['Ativos', 'ativos'], ['Em atenção', 'atencao'], ['Dados incompletos', 'incompletos']] },
   funcionarios: { collection: 'funcionarios', title: 'Visão de funcionários', description: 'Resumo do cadastro e da qualidade das informações.', icon: '🧑‍💼', metrics: [['Total cadastrado', 'total'], ['Ativos', 'ativos'], ['Inativos', 'inativos'], ['Dados incompletos', 'incompletos']] },
-  ticketlog: { collection: 'ticketlog', title: 'Painel Ticket Log', description: 'Acompanhe os registros e os principais pontos de conferência.', icon: '🎫', metrics: [['Registros', 'total'], ['Ativos', 'ativos'], ['CNH a verificar', 'cnh'], ['Dados incompletos', 'incompletos']] },
-  cobli: { collection: 'cobli', title: 'Painel Cobli', description: 'Visão geral dos registros vinculados à operação Cobli.', icon: '📡', metrics: [['Registros', 'total'], ['Ativos', 'ativos'], ['CNH a verificar', 'cnh'], ['Dados incompletos', 'incompletos']] },
+  ticketlog: { collection: 'ticketlog', title: 'Painel de conferência Ticket Log', description: 'Compare os condutores cadastrados com os usuários liberados para abastecimento.', icon: '🎫', metrics: [['Cadastros Ticket Log', 'total'], ['Condutores sem Ticket Log', 'semIntegracao'], ['Ticket Log sem condutor', 'semCondutor'], ['Registros sem matrícula', 'semMatricula']] },
+  cobli: { collection: 'cobli', title: 'Painel de conferência Cobli', description: 'Confira se cada condutor possui cadastro na telemetria e identificador iButton.', icon: '📡', metrics: [['Cadastros Cobli', 'total'], ['Condutores sem Cobli/iButton', 'semIntegracao'], ['Cobli sem condutor', 'semCondutor'], ['Sem identificador iButton', 'semIbutton']] },
   multas: { collection: 'multas', title: 'Painel de multas', description: 'Priorize processos em aberto, prazos e registros que precisam de revisão.', icon: '🚨', metrics: [['Infrações cadastradas', 'total'], ['Em acompanhamento', 'abertas'], ['Prazo legal vencido', 'vencidas'], ['Enviadas ao RH', 'rh']] },
 };
 const norm = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-const first = (row, keys) => keys.map((key) => row[key]).find((value) => value !== undefined && value !== null && String(value).trim() !== '');
+const first = (row, keys) => {
+  const entries = Object.entries(row || {});
+  for (const key of keys) {
+    const found = entries.find(([name, value]) => norm(name) === norm(key) && value !== undefined && value !== null && String(value).trim() !== '');
+    if (found) return found[1];
+  }
+  return undefined;
+};
+const identity = (row) => {
+  const matricula = norm(first(row, ['Matrícula', 'Matricula', 'matricula', 'Matrícula do condutor']));
+  const cpf = norm(first(row, ['CPF', 'cpf']));
+  const nome = norm(first(row, ['Nome', 'nome', 'Condutor', 'Condutor identificado']));
+  return matricula ? 'matricula:' + matricula : cpf ? 'cpf:' + cpf : nome ? 'nome:' + nome : '';
+};
 
 function summarize(rows, key) {
   const statusKeys = ['status', 'Status', 'Status do Processo', 'Status Condutor', 'Status Veículo', 'Status Motorista', 'status no cadastro'];
@@ -58,35 +71,56 @@ function summarize(rows, key) {
 export default function DashboardInteligente({ modulo }) {
   const config = MODULOS[modulo];
   const [rows, setRows] = useState([]);
+  const [relatedRows, setRelatedRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [refresh, setRefresh] = useState(0);
-  // Cacheia cada painel por cinco minutos; o botão Atualizar força nova leitura.
+  // Os painéis Ticket Log e Cobli comparam a integração com a lista de condutores.
   useEffect(() => {
     let alive = true;
-    const cached = dashboardCache.get(config.collection);
-    if (refresh === 0 && cached && Date.now() - cached.updatedAt < DASHBOARD_CACHE_TTL_MS) {
-      queueMicrotask(() => {
+    setLoading(true);
+    setError(false);
+    const needsComparison = modulo === 'ticketlog' || modulo === 'cobli';
+    const requests = [getDocs(collection(db, config.collection))];
+    if (needsComparison) requests.push(getDocs(collection(db, 'condutores')));
+    Promise.all(requests)
+      .then((snapshots) => {
         if (!alive) return;
-        setRows(cached.rows);
-        setError(false);
-        setLoading(false);
-      });
-      return () => { alive = false; };
-    }
-    queueMicrotask(() => { if (alive) { setLoading(true); setError(false); } });
-    getDocs(collection(db, config.collection))
-      .then((snapshot) => {
-        if (!alive) return;
-        const nextRows = snapshot.docs.map((item) => item.data());
-        dashboardCache.set(config.collection, { rows: nextRows, updatedAt: Date.now() });
-        setRows(nextRows);
+        const ownRows = snapshots[0].docs.map((item) => item.data());
+        const drivers = needsComparison ? snapshots[1].docs.map((item) => item.data()) : [];
+        setRows(ownRows);
+        setRelatedRows(drivers);
+        dashboardCache.set(config.collection, { rows: ownRows, updatedAt: Date.now() });
       })
-      .catch(() => { if (alive) { setRows([]); setError(true); } })
+      .catch(() => { if (alive) { setRows([]); setRelatedRows([]); setError(true); } })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [config.collection, refresh]);
-  const stats = useMemo(() => summarize(rows, modulo), [rows, modulo]);
+  }, [config.collection, modulo, refresh]);
+  const stats = useMemo(() => {
+    const base = summarize(rows, modulo);
+    if (modulo !== 'ticketlog' && modulo !== 'cobli') return base;
+    const systemIds = new Set(rows.map(identity).filter(Boolean));
+    const driverIds = new Set(relatedRows.map(identity).filter(Boolean));
+    const semIntegracao = relatedRows.filter((driver) => {
+      const id = identity(driver);
+      if (!id || systemIds.has(id)) return false;
+      return true;
+    }).length;
+    const semCondutor = rows.filter((record) => {
+      const id = identity(record);
+      return !id || !driverIds.has(id);
+    }).length;
+    const semMatricula = rows.filter((record) => !norm(first(record, ['Matrícula', 'Matricula', 'matricula']))).length;
+    const semIbutton = modulo === 'cobli' ? rows.filter((record) => !String(first(record, ['Identificador', 'iButton', 'IBUTTON', 'Código do app']) ?? '').trim()).length : 0;
+    const semIntegracaoFinal = modulo === 'cobli'
+      ? relatedRows.filter((driver) => {
+          const id = identity(driver);
+          const cobli = rows.find((record) => id && identity(record) === id);
+          return !cobli || !String(first(cobli, ['Identificador', 'iButton', 'IBUTTON', 'Código do app']) ?? '').trim();
+        }).length
+      : semIntegracao;
+    return { ...base, semIntegracao: semIntegracaoFinal, semCondutor, semMatricula, semIbutton };
+  }, [rows, relatedRows, modulo]);
   const descriptions = {
     total: 'Registros encontrados na base',
     ativos: 'Com status ativo/regular reconhecido',
@@ -97,6 +131,10 @@ export default function DashboardInteligente({ modulo }) {
     vencidas: 'Prazo legal vencido e ainda em acompanhamento',
     rh: 'Etapa final do PPCM concluída',
     atencao: 'Registros com status de atenção',
+    semIntegracao: modulo === 'cobli' ? 'Condutores sem cadastro completo ou iButton na Cobli' : 'Condutores sem cadastro de acesso ao abastecimento',
+    semCondutor: 'Registros sem correspondência em Condutores',
+    semMatricula: 'Cadastros sem matrícula para cruzamento confiável',
+    semIbutton: 'Cadastros Cobli sem identificador preenchido',
   };
   const valueFor = (id) => id === 'atencao' ? rows.filter((r) => /(oficina|manutenc|bloquead|inativo|pendente)/.test(norm(first(r, ['Status', 'Status Veículo', 'Situação'])))).length : stats[id];
   return (
