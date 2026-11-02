@@ -1,4 +1,5 @@
 // src/Cobli.jsx
+import AnexosCadastro from "./AnexosCadastro";
 import { useMemo, useRef, useState } from "react";
 import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
@@ -272,6 +273,8 @@ export default function Cobli() {
               </label>
             ))}
           </div>
+
+          <AnexosCadastro collectionName="cobli" recordId={form.__docId || form["Matrícula"] || form["Nome"]} anexos={form.Anexos || []} onChange={(anexos) => onChange("Anexos", anexos)} />
 
           <div className="mt-4 flex gap-2">
             <button
