@@ -122,6 +122,29 @@ function exibirValor(valor) {
   return String(valor);
 }
 
+// Firestore pode devolver Timestamp em qualquer campo do documento,
+// inclusive campos que não aparecem no cartão (formulário e anexos).
+// Normalize o documento inteiro antes de entregá-lo ao React.
+function normalizarDadosFirestore(valor) {
+  if (valor == null) return valor;
+  if (valor instanceof Date) return valor.toLocaleDateString("pt-BR");
+  if (typeof valor?.toDate === "function") {
+    const data = valor.toDate();
+    return Number.isNaN(data.getTime()) ? "" : data.toLocaleDateString("pt-BR");
+  }
+  if (typeof valor === "object" && Number.isFinite(valor.seconds)) {
+    const data = new Date(valor.seconds * 1000);
+    return Number.isNaN(data.getTime()) ? "" : data.toLocaleDateString("pt-BR");
+  }
+  if (Array.isArray(valor)) return valor.map(normalizarDadosFirestore);
+  if (typeof valor === "object") {
+    return Object.fromEntries(
+      Object.entries(valor).map(([chave, item]) => [chave, normalizarDadosFirestore(item)])
+    );
+  }
+  return valor;
+}
+
 export default function Funcionarios() {
   const [form, setForm] = useState(vazio());
   const [funcionarios, setFuncionarios] = useState([]);
@@ -167,7 +190,10 @@ export default function Funcionarios() {
       }
       const snap = await getDocs(consulta);
       const docsVisiveis = snap.docs.slice(0, TAMANHO_PAGINA);
-      setFuncionarios(docsVisiveis.map((item) => ({ __docId: item.id, ...item.data() })));
+      setFuncionarios(docsVisiveis.map((item) => ({
+        __docId: item.id,
+        ...normalizarDadosFirestore(item.data()),
+      })));
       setUltimoDoc(docsVisiveis.length ? docsVisiveis[docsVisiveis.length - 1] : null);
       setTemProxima(snap.docs.length > TAMANHO_PAGINA);
       if (!q && total === null) {
