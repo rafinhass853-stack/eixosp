@@ -142,7 +142,8 @@ export default function TicketLog() {
   // ---------------------------------------------------
 
   return (
-    <div className="font-sans">\n      {aba === "lista" && <PainelConferenciaIntegracoes modulo="ticketlog" />}
+    <div className="font-sans">
+      {aba === "lista" && <PainelConferenciaIntegracoes modulo="ticketlog" />}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">Ticket Log</h1>
         <nav className="flex gap-2">
