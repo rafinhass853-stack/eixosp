@@ -5,7 +5,7 @@ const { getFirestore } = require("firebase-admin/firestore");
 initializeApp();
 const db = getFirestore();
 
-const normalizar = (valor) => String(valor ?? "").trim().replace(/^0+(?=\d)/, "");
+const normalizar = (valor) => String(valor ?? "").trim();
 
 exports.validarMatricula = onCall(
   { region: "southamerica-east1", maxInstances: 10, enforceAppCheck: false },
