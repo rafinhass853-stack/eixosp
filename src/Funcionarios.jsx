@@ -102,8 +102,13 @@ const CAMPOS_FUNCIONARIO = [
  * o nome correto desse campo (ex.: "Nome Social"), troque aqui.
  */
 const ALIAS_IMPORTACAO = {
-  // cabeçalho na planilha -> nome interno
-  // (ajuste conforme sua regra de negócio)
+  // Cabeçalhos alternativos usados nas planilhas de RH.
+  "iButton": "Possui iButton",
+  "Ibutton": "Possui iButton",
+  "Possui Ibutton": "Possui iButton",
+  "Status do Termo": "Status Termo",
+  "Situação Termo": "Status Termo",
+  "Situacao Termo": "Status Termo",
 };
 
 const vazio = () =>
@@ -545,7 +550,13 @@ export default function Funcionarios() {
             {CAMPOS_FUNCIONARIO.map((campo, indice) => (
               <label key={`${campo}-${indice}`} className="flex flex-col text-sm">
                 <span className="text-xs text-muted mb-1">{campo}</span>
-                <input value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} className="px-2 py-1.5 border rounded-md" />
+                {campo === "Possui iButton" ? (
+                  <select value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} className="px-2 py-1.5 border rounded-md"><option value="">Não informado</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
+                ) : campo === "Status Termo" ? (
+                  <select value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} className="px-2 py-1.5 border rounded-md"><option value="">Não informado</option><option value="Pendente">Pendente</option><option value="Assinado">Assinado</option></select>
+                ) : (
+                  <input value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} className="px-2 py-1.5 border rounded-md" />
+                )}
               </label>
             ))}
           </div>
