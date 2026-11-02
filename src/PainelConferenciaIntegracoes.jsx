@@ -30,7 +30,7 @@ export default function PainelConferenciaIntegracoes({ modulo }) {
     let ativo = true;
     setLoading(true);
     setErro('');
-    Promise.all(['condutores', 'ticketlog', 'cobli'].map(async (nome) => {
+    Promise.all(['funcionarios', 'condutores', 'ticketlog', 'cobli'].map(async (nome) => {
       const snapshot = await getDocs(collection(db, nome));
       return [nome, snapshot.docs.map((item) => ({ __docId: item.id, ...item.data() }))];
     }))
@@ -65,10 +65,10 @@ export default function PainelConferenciaIntegracoes({ modulo }) {
       ticketlog: ticketlog.filter((r) => !keyOf(r)).length,
       cobli: cobli.filter((r) => !keyOf(r)).length,
     };
-    return { ticketAusentes, ticketExtras, cobliAusentes, cobliExtras, semIbutton, semChave, totals: { condutores: condutores.length, ticketlog: ticketlog.length, cobli: cobli.length } };
+    return { ticketAusentes, ticketExtras, cobliAusentes, cobliExtras, condutoresSemFuncionario, semIbutton, semChave, totals: { funcionarios: funcionarios.length, condutores: condutores.length, ticketlog: ticketlog.length, cobli: cobli.length } };
   }, [dados]);
 
-  if (modulo !== 'ticketlog' && modulo !== 'cobli') return null;
+  if (modulo !== 'condutores' && modulo !== 'ticketlog' && modulo !== 'cobli') return null;
   const ticket = modulo === 'ticketlog';
   const missing = ticket ? relatorio.ticketAusentes : relatorio.cobliAusentes;
   const extra = ticket ? relatorio.ticketExtras : relatorio.cobliExtras;
@@ -86,16 +86,16 @@ export default function PainelConferenciaIntegracoes({ modulo }) {
       {loading ? <p className="text-sm text-slate-600">Conferindo as bases…</p> : erro ? <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p> : <>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-lg bg-slate-50 p-3"><span className="text-sm text-slate-600">Condutores (base NextFleet)</span><strong className="mt-1 block text-2xl">{relatorio.totals.condutores.toLocaleString('pt-BR')}</strong></div>
-          <div className="rounded-lg bg-slate-50 p-3"><span className="text-sm text-slate-600">{ticket ? 'Registros Ticket Log' : 'Registros Cobli'}</span><strong className="mt-1 block text-2xl">{(ticket ? relatorio.totals.ticketlog : relatorio.totals.cobli).toLocaleString('pt-BR')}</strong></div>
-          {!ticket && <div className="rounded-lg bg-amber-50 p-3"><span className="text-sm text-amber-900">Cobli sem iButton/identificador</span><strong className="mt-1 block text-2xl text-amber-900">{relatorio.semIbutton.length.toLocaleString('pt-BR')}</strong></div>}
-          {ticket && <div className="rounded-lg bg-amber-50 p-3"><span className="text-sm text-amber-900">Divergências encontradas</span><strong className="mt-1 block text-2xl text-amber-900">{(relatorio.ticketAusentes.length + relatorio.ticketExtras.length).toLocaleString('pt-BR')}</strong></div>}
+          <div className="rounded-lg bg-slate-50 p-3"><span className="text-sm text-slate-600">{baseMae ? 'Condutores cadastrados no NextFleet' : ticket ? 'Registros Ticket Log' : 'Registros Cobli'}</span><strong className="mt-1 block text-2xl">{(baseMae ? relatorio.totals.condutores : ticket ? relatorio.totals.ticketlog : relatorio.totals.cobli).toLocaleString('pt-BR')}</strong></div>
+          {baseMae && <div className="rounded-lg bg-slate-50 p-3"><span className="text-sm text-slate-600">Funcionários na base-mãe</span><strong className="mt-1 block text-2xl">{relatorio.totals.funcionarios.toLocaleString('pt-BR')}</strong></div>}\n          {!ticket && !baseMae && <div className="rounded-lg bg-amber-50 p-3"><span className="text-sm text-amber-900">Cobli sem iButton/identificador</span><strong className="mt-1 block text-2xl text-amber-900">{relatorio.semIbutton.length.toLocaleString('pt-BR')}</strong></div>}
+          {baseMae && <div className="rounded-lg bg-amber-50 p-3"><span className="text-sm text-amber-900">Condutores sem funcionário correspondente</span><strong className="mt-1 block text-2xl text-amber-900">{relatorio.condutoresSemFuncionario.length.toLocaleString('pt-BR')}</strong></div>}\n          {ticket && <div className="rounded-lg bg-amber-50 p-3"><span className="text-sm text-amber-900">Divergências encontradas</span><strong className="mt-1 block text-2xl text-amber-900">{(relatorio.ticketAusentes.length + relatorio.ticketExtras.length).toLocaleString('pt-BR')}</strong></div>}
         </div>
         <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3"><h3 className="font-semibold text-amber-950">{ticket ? 'Em Condutores, mas não no Ticket Log' : 'Em Condutores, mas não na Cobli'}</h3>{renderList(missing, 'Nenhuma divergência identificada nesta direção.')}</div>
-          <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3"><h3 className="font-semibold text-amber-950">{ticket ? 'No Ticket Log, mas não em Condutores' : 'Na Cobli, mas não em Condutores'}</h3>{renderList(extra, 'Nenhuma divergência identificada nesta direção.')}</div>
-          {!ticket && <div className="rounded-lg border border-rose-200 bg-rose-50/60 p-3 lg:col-span-2"><h3 className="font-semibold text-rose-950">Registros Cobli sem iButton/identificador</h3>{renderList(relatorio.semIbutton, 'Todos os registros Cobli possuem o campo Identificador preenchido.')}</div>}
+          <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3"><h3 className="font-semibold text-amber-950">{baseMae ? 'Condutores que não foram encontrados na base-mãe' : ticket ? 'Em Condutores, mas não no Ticket Log' : 'Em Condutores, mas não na Cobli'}</h3>{renderList(missing, 'Nenhuma divergência identificada nesta direção.')}</div>
+          {!baseMae && <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3"><h3 className="font-semibold text-amber-950">{ticket ? 'No Ticket Log, mas não em Condutores' : 'Na Cobli, mas não em Condutores'}</h3>{renderList(extra, 'Nenhuma divergência identificada nesta direção.')}</div>}
+          {!ticket && !baseMae && <div className="rounded-lg border border-rose-200 bg-rose-50/60 p-3 lg:col-span-2"><h3 className="font-semibold text-rose-950">Registros Cobli sem iButton/identificador</h3>{renderList(relatorio.semIbutton, 'Todos os registros Cobli possuem o campo Identificador preenchido.')}</div>}
         </div>
-        {(relatorio.semChave.condutores + relatorio.semChave[ticket ? 'ticketlog' : 'cobli']) > 0 && <p className="mt-3 text-xs text-slate-600">Atenção: existem registros sem matrícula e sem CPF, que não podem ser comparados com segurança. Condutores: {relatorio.semChave.condutores}; {ticket ? 'Ticket Log' : 'Cobli'}: {relatorio.semChave[ticket ? 'ticketlog' : 'cobli']}.</p>}
+        {(relatorio.semChave.condutores + relatorio.semChave[baseMae ? 'condutores' : ticket ? 'ticketlog' : 'cobli']) > 0 && <p className="mt-3 text-xs text-slate-600">Atenção: existem registros sem matrícula e sem CPF, que não podem ser comparados com segurança. Condutores: {relatorio.semChave.condutores}; {baseMae ? 'Condutores' : ticket ? 'Ticket Log' : 'Cobli'}: {relatorio.semChave[baseMae ? 'condutores' : ticket ? 'ticketlog' : 'cobli']}.</p>}
       </>}
     </section>
   );
