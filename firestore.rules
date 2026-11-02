@@ -1,12 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Fail closed: matrícula digitada e localStorage não são credenciais confiáveis.
-    // Nenhum acesso direto do navegador a documentos é liberado por estas regras.
-    // Para habilitar os módulos, implemente autenticação real e regras por coleção
-    // com claims/roles emitidas exclusivamente por backend confiável.
+    // O login cria uma sessão Firebase Authentication no backend.
+    // Acesso autenticado aos módulos existentes do EixoSP.
+    // Atenção: estas regras liberam leitura e gravação de todas as coleções
+    // para qualquer conta autenticada; restrinja por perfil/coleção antes
+    // de armazenar ou expor dados pessoais e financeiros em produção.
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if request.auth != null;
     }
   }
 }
