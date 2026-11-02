@@ -1,4 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "./firebase";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
@@ -55,6 +57,15 @@ const fmt = (value) => {
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString("pt-BR");
 };
+const normKey = (s) => String(s ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const fieldValue = (row, names) => {
+  const entries = Object.entries(row || {});
+  for (const name of names) {
+    const found = entries.find(([key, value]) => normKey(key) === normKey(name) && value != null && String(value).trim() !== "");
+    if (found) return String(found[1]).trim();
+  }
+  return "";
+};
 const slug = (s) => String(s || "arquivo").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 90);
 
 export default function Multas() {
@@ -66,8 +77,32 @@ export default function Multas() {
   const [filtroEtapa, setFiltroEtapa] = useState("Todas");
   const [erro, setErro] = useState("");
   const [arquivos, setArquivos] = useState([]);
+  const [condutoresSistema, setCondutoresSistema] = useState([]);
+  const [veiculosSistema, setVeiculosSistema] = useState([]);
+  const [cadastrosLoading, setCadastrosLoading] = useState(true);
+  const [cadastrosErro, setCadastrosErro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const fileRef = useRef(null);
+
+  useEffect(() => {
+    let ativo = true;
+    Promise.all([getDocs(collection(db, "condutores")), getDocs(collection(db, "veiculos"))])
+      .then(([condSnap, veicSnap]) => {
+        if (!ativo) return;
+        setCondutoresSistema(condSnap.docs.map((d) => ({ __id: d.id, ...d.data() }))
+          .map((r) => ({ ...r, __nome: fieldValue(r, ["nome", "Nome", "Condutor"]), __matricula: fieldValue(r, ["matricula", "Matrícula", "Matricula"]) }))
+          .filter((r) => r.__nome));
+        setVeiculosSistema(veicSnap.docs.map((d) => ({ __id: d.id, ...d.data() }))
+          .map((r) => ({ ...r, __placa: fieldValue(r, ["Placa", "placa"]), __frota: fieldValue(r, ["Nº Frota", "Numero da frota", "Número da frota", "Frota"]), __modelo: fieldValue(r, ["Modelo Completo", "Modelo", "Modelo do veículo"]), __propriedade: fieldValue(r, ["Propriedade", "Propriedade / locadora"]) }))
+          .filter((r) => r.__placa));
+      })
+      .catch((err) => {
+        console.error("Falha ao carregar cadastros para multas", err);
+        if (ativo) setCadastrosErro("Não foi possível consultar os cadastros de condutores e veículos. Confira as permissões do Firestore.");
+      })
+      .finally(() => { if (ativo) setCadastrosLoading(false); });
+    return () => { ativo = false; };
+  }, []);
 
   const abertas = registros.filter((r) => r["Etapa atual"] !== "Enviado ao RH");
   const enviadasRh = registros.filter((r) => r["Etapa atual"] === "Enviado ao RH");
@@ -92,6 +127,12 @@ export default function Multas() {
     e.preventDefault(); setErro("");
     if (!String(form.AIT || "").trim() && !String(form["ID interno"] || "").trim()) {
       setErro("Informe o AIT ou o ID interno para identificar a infração."); return;
+    }
+    if (!veiculosSistema.some((v) => v.__placa === String(form["Placa"] || ""))) {
+      setErro("Selecione um veículo cadastrado no menu Veículos para registrar esta multa."); return;
+    }
+    if (form["Condutor identificado"] && !condutoresSistema.some((d) => d.__nome === String(form["Condutor identificado"]))) {
+      setErro("O condutor informado não foi encontrado no cadastro Condutores. Selecione um condutor cadastrado ou deixe em branco até identificá-lo."); return;
     }
     const duplicado = registros.findIndex((r, i) => i !== editIndex && (
       (form.AIT && String(r.AIT || "").trim().toLowerCase() === String(form.AIT).trim().toLowerCase()) ||
@@ -167,7 +208,23 @@ export default function Multas() {
   const inputField = ([campo, tipo, obrigatorio, opcoes]) => (
     <label key={campo} className={`fine-field ${tipo === "textarea" ? "fine-field-wide" : ""}`}>
       <span>{campo}{obrigatorio ? " *" : ""}</span>
-      {tipo === "select" ? <select value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} required={!!obrigatorio}>
+      {campo === "Placa" ? <select value={form[campo] ?? ""} onChange={(e) => {
+        const placa = e.target.value;
+        const veiculo = veiculosSistema.find((v) => v.__placa === placa);
+        setForm((f) => ({ ...f, "Placa": placa, "Número da frota": veiculo?.__frota || "", "Modelo do veículo": veiculo?.__modelo || "", "Propriedade / locadora": veiculo?.__propriedade || "" }));
+      }} required disabled={cadastrosLoading || veiculosSistema.length === 0}>
+        <option value="">{cadastrosLoading ? "Carregando veículos..." : veiculosSistema.length ? "Selecione um veículo cadastrado..." : "Nenhum veículo cadastrado"}</option>
+        {form[campo] && !veiculosSistema.some((v) => v.__placa === form[campo]) && <option value={form[campo]}>{form[campo]} — não localizado no cadastro</option>}
+        {veiculosSistema.map((v) => <option key={v.__id} value={v.__placa}>{v.__placa}{v.__frota ? ` · Frota ${v.__frota}` : ""}{v.__modelo ? ` · ${v.__modelo}` : ""}</option>)}
+      </select> : campo === "Condutor identificado" ? <select value={form[campo] ?? ""} onChange={(e) => {
+        const nome = e.target.value;
+        const condutor = condutoresSistema.find((d) => d.__nome === nome);
+        setForm((f) => ({ ...f, "Condutor identificado": nome, "Matrícula do condutor": condutor?.__matricula || "" }));
+      }} disabled={cadastrosLoading || condutoresSistema.length === 0}>
+        <option value="">{cadastrosLoading ? "Carregando condutores..." : "Ainda não identificado"}</option>
+        {form[campo] && !condutoresSistema.some((d) => d.__nome === form[campo]) && <option value={form[campo]}>{form[campo]} — não localizado no cadastro</option>}
+        {condutoresSistema.map((d) => <option key={d.__id} value={d.__nome}>{d.__nome}{d.__matricula ? ` · ${d.__matricula}` : ""}</option>)}
+      </select> : tipo === "select" ? <select value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} required={!!obrigatorio}>
         <option value="">Selecione...</option>{opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
       </select> : tipo === "textarea" ? <textarea rows={3} value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} /> :
         <input type={tipo} min={tipo === "number" ? "0" : undefined} step={tipo === "number" && campo.includes("Valor") ? "0.01" : "1"} value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} required={!!obrigatorio} />}
@@ -191,6 +248,7 @@ export default function Multas() {
       <button type="button" className="fine-secondary" onClick={() => setAba(aba === "importar" ? "lista" : "importar")}>Importar</button>
     </div>
 
+    {cadastrosErro && <div className="fine-error" role="alert">{cadastrosErro}</div>}
     {aba === "importar" && <section className="fine-panel fine-import"><h3>Importar processos existentes</h3><p>Importa apenas linhas com AIT ou ID interno ainda não cadastrado. Não sobrescreve registros existentes.</p><input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) importarArquivo(f); e.target.value = ""; }} /><p className="fine-message">A planilha deve usar os cabeçalhos do modelo Excel.</p>{erro && <p className="fine-error">{erro}</p>}</section>}
 
     {aba === "form" ? <form className="fine-editor" onSubmit={salvar}>
