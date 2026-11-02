@@ -1,5 +1,6 @@
 // src/firebase.js
 import { initializeApp } from 'firebase/app';
+import { getFunctions } from 'firebase/functions';
 import {
   getFirestore,
   initializeFirestore,
@@ -18,6 +19,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const functions = getFunctions(app, 'southamerica-east1');
 
 let db;
 try {
@@ -27,10 +29,9 @@ try {
     }),
   });
 } catch (error) {
-  // Fallback para ambientes que bloqueiam IndexedDB ou já inicializaram o Firestore.
   console.warn('Cache persistente indisponível; usando cache padrão.', error);
   db = getFirestore(app);
 }
 
-export { db };
+export { db, functions };
 export default app;
