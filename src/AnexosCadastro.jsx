@@ -49,7 +49,7 @@ export default function AnexosCadastro({ collectionName, recordId, anexos = [], 
       const storage = getStorage();
       const prefixo = `cadastros/${segment(collectionName)}/${segment(recordId)}`;
       for (const file of pendentes) {
-        const caminho = `${prefixo}/${Date.now()}-${crypto.randomUUID()}-${segment(file.name)}`;
+        const caminho = `${prefixo}/${Date.now()}-${(globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))}-${segment(file.name)}`;
         const destino = ref(storage, caminho);
         await uploadBytes(destino, file, { contentType: file.type || 'application/octet-stream', customMetadata: { originalName: file.name } });
         enviados.push({
@@ -62,7 +62,7 @@ export default function AnexosCadastro({ collectionName, recordId, anexos = [], 
         });
         setProgresso(`${enviados.length} de ${pendentes.length} arquivo(s) enviado(s)`);
       }
-      onChange([...(Array.isArray(anexos) ? anexos : []), ...enviados]);
+      await onChange([...(Array.isArray(anexos) ? anexos : []), ...enviados]);
       setPendentes([]);
       if (inputRef.current) inputRef.current.value = '';
       setProgresso('Anexos enviados. Salve o cadastro para registrar os vínculos.');
@@ -81,7 +81,7 @@ export default function AnexosCadastro({ collectionName, recordId, anexos = [], 
     if (!ok) return;
     try {
       if (anexo.caminho) await deleteObject(ref(getStorage(), anexo.caminho));
-      onChange((Array.isArray(anexos) ? anexos : []).filter((item) => !(item.caminho === anexo.caminho && item.url === anexo.url)));
+      await onChange((Array.isArray(anexos) ? anexos : []).filter((item) => !(item.caminho === anexo.caminho && item.url === anexo.url)));
     } catch (error) {
       console.error('Falha ao remover anexo:', error);
       setErro('Não foi possível excluir o arquivo do Storage. Verifique as permissões.');
