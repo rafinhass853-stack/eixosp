@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import AnexosCadastro from "./AnexosCadastro";
 import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
 
@@ -414,6 +415,8 @@ export default function Veiculos() {
               </label>
             ))}
           </div>
+
+          <AnexosCadastro collectionName="veiculos" recordId={form.__docId || form["Placa"] || form["Nº Frota"]} anexos={form.Anexos || []} onChange={(anexos) => onChange("Anexos", anexos)} />
 
           <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
             <button type="submit">Salvar</button>
