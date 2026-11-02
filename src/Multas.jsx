@@ -57,7 +57,7 @@ const fmt = (value) => {
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString("pt-BR");
 };
-const normKey = (s) => String(s ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const normKey = (s) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const fieldValue = (row, names) => {
   const entries = Object.entries(row || {});
   for (const name of names) {
