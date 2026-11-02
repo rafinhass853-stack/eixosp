@@ -5,6 +5,8 @@ import AnexosCadastro from './AnexosCadastro';
 
 const LOCADORAS = ['Movida', 'CCV', 'Naubrás', 'Emtel', 'Dinâmica'];
 const COL = 'locadoras';
+const CACHE_TTL_MS = 5 * 60 * 1000;
+let locadorasCache = { rows: null, updatedAt: 0 };
 
 function exibir(valor) {
   if (valor == null) return '';
@@ -35,10 +37,17 @@ export default function Locadoras() {
 
   useEffect(() => {
     let ativo = true;
+    if (locadorasCache.rows && Date.now() - locadorasCache.updatedAt < CACHE_TTL_MS) {
+      setLinhas(locadorasCache.rows);
+      setCarregando(false);
+      return () => { ativo = false; };
+    }
     (async () => {
       try {
         const snapshot = await getDocs(collection(db, COL));
-        if (ativo) setLinhas(snapshot.docs.map((doc) => ({ __docId: doc.id, ...doc.data() })));
+        const rows = snapshot.docs.map((doc) => ({ __docId: doc.id, ...doc.data() }));
+        locadorasCache = { rows, updatedAt: Date.now() };
+        if (ativo) setLinhas(rows);
       } catch (error) {
         console.error('Erro ao carregar locadoras:', error);
         if (ativo) setErro('Não foi possível carregar os dados das locadoras.');
@@ -119,7 +128,11 @@ export default function Locadoras() {
               {filtradas.map((linha) => (
                 <tr key={linha.__docId || `${linha.placa}-${linha.id}`} className="border-t border-gray-100 hover:bg-surface align-top">
                   {colunas.map((coluna) => <td key={coluna} className="px-4 py-2 whitespace-nowrap">{exibir(linha[coluna]) || '—'}</td>)}
-                  <td className="px-4 py-2 min-w-[220px]"><details><summary className="cursor-pointer text-brand-700">{(linha.Anexos || []).length} anexo(s) · Gerenciar</summary><div className="mt-2 min-w-[280px]"><AnexosCadastro collectionName={COL} recordId={linha.__docId || linha.id || linha.placa} anexos={linha.Anexos || []} onChange={async (anexos) => { const id = linha.__docId; if (!id) throw new Error('Registro sem identificador no Firestore.'); await setDoc(doc(db, COL, id), { Anexos: anexos }, { merge: true }); setLinhas((current) => current.map((item) => item.__docId === id ? { ...item, Anexos: anexos } : item)); }} /></div></details></td>
+                  <td className="px-4 py-2 min-w-[220px]"><details><summary className="cursor-pointer text-brand-700">{(linha.Anexos || []).length} anexo(s) · Gerenciar</summary><div className="mt-2 min-w-[280px]"><AnexosCadastro collectionName={COL} recordId={linha.__docId || linha.id || linha.placa} anexos={linha.Anexos || []} onChange={async (anexos) => { const id = linha.__docId; if (!id) throw new Error('Registro sem identificador no Firestore.'); await setDoc(doc(db, COL, id), { Anexos: anexos }, { merge: true }); setLinhas((current) => {
+                    const rows = current.map((item) => item.__docId === id ? { ...item, Anexos: anexos } : item);
+                    locadorasCache = { rows, updatedAt: Date.now() };
+                    return rows;
+                  }); }} /></div></details></td>
                 </tr>
               ))}
             </tbody>
