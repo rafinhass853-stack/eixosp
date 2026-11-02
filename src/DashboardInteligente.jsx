@@ -68,7 +68,7 @@ function summarize(rows, key) {
 }
 
 export default function DashboardInteligente({ modulo }) {
-  const config = MODULOS[modulo];
+  const config = MODULOS[modulo] || MODULOS.funcionarios;
   const [rows, setRows] = useState([]);
   const [relatedRows, setRelatedRows] = useState([]);
   const [loading, setLoading] = useState(true);
