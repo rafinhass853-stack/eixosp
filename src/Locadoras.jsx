@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import AnexosCadastro from './AnexosCadastro';
 
 const LOCADORAS = ['Movida', 'CCV', 'Naubrás', 'Emtel', 'Dinâmica'];
 const COL = 'locadoras';
@@ -111,12 +112,14 @@ export default function Locadoras() {
             <thead className="bg-surface sticky top-0 z-10">
               <tr className="text-left text-muted uppercase text-xs">
                 {colunas.map((coluna) => <th key={coluna} className="px-4 py-3 whitespace-nowrap">{coluna}</th>)}
+                <th className="px-4 py-3 whitespace-nowrap">Fotos e arquivos</th>
               </tr>
             </thead>
             <tbody>
               {filtradas.map((linha) => (
                 <tr key={linha.__docId || `${linha.placa}-${linha.id}`} className="border-t border-gray-100 hover:bg-surface align-top">
                   {colunas.map((coluna) => <td key={coluna} className="px-4 py-2 whitespace-nowrap">{exibir(linha[coluna]) || '—'}</td>)}
+                  <td className="px-4 py-2 min-w-[220px]"><details><summary className="cursor-pointer text-brand-700">{(linha.Anexos || []).length} anexo(s) · Gerenciar</summary><div className="mt-2 min-w-[280px]"><AnexosCadastro collectionName={COL} recordId={linha.__docId || linha.id || linha.placa} anexos={linha.Anexos || []} onChange={async (anexos) => { const id = linha.__docId; if (!id) throw new Error('Registro sem identificador no Firestore.'); await setDoc(doc(db, COL, id), { Anexos: anexos }, { merge: true }); setLinhas((current) => current.map((item) => item.__docId === id ? { ...item, Anexos: anexos } : item)); }} /></div></details></td>
                 </tr>
               ))}
             </tbody>
