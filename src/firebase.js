@@ -1,5 +1,6 @@
 // src/firebase.js
 import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
 import { getFunctions } from 'firebase/functions';
 import {
   getFirestore,
@@ -19,6 +20,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const functions = getFunctions(app, 'southamerica-east1');
 
 let db;
@@ -33,5 +35,5 @@ try {
   db = getFirestore(app);
 }
 
-export { db, functions };
+export { auth, db, functions };
 export default app;
