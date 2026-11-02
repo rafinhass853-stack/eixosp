@@ -2,6 +2,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useFirestoreCollection } from "./firestoreSync";
 import * as XLSX from "xlsx";
+import PainelConferenciaIntegracoes from "./PainelConferenciaIntegracoes";
 
 /**
  * Lista COMPLETA de campos do Cobli
@@ -145,7 +146,7 @@ export default function Cobli() {
   // ---------------------------------------------------
 
   return (
-    <div className="font-sans">
+    <div className="font-sans">\n      {aba === "lista" && <PainelConferenciaIntegracoes modulo="cobli" />}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">Cobli</h1>
         <nav className="flex gap-2">
