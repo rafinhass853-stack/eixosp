@@ -91,7 +91,7 @@ export default function Multas() {
         if (!ativo) return;
         setCondutoresSistema(condSnap.docs.map((d) => ({ __id: d.id, ...d.data() }))
           .map((r) => ({ ...r, __nome: fieldValue(r, ["nome", "Nome", "Condutor"]), __matricula: fieldValue(r, ["matricula", "Matrícula", "Matricula"]), __cpf: fieldValue(r, ["cpf", "CPF"]) }))
-          .filter((r) => r.__nome));
+          .filter((r) => r.__nome && (r.__matricula || r.__cpf)));
         setVeiculosSistema(veicSnap.docs.map((d) => ({ __id: d.id, ...d.data() }))
           .map((r) => ({ ...r, __placa: fieldValue(r, ["Placa", "placa"]), __frota: fieldValue(r, ["Nº Frota", "Numero da frota", "Número da frota", "Frota"]), __modelo: fieldValue(r, ["Modelo Completo", "Modelo", "Modelo do veículo"]), __propriedade: fieldValue(r, ["Propriedade", "Propriedade / locadora"]) }))
           .filter((r) => r.__placa));
@@ -223,7 +223,7 @@ export default function Multas() {
       }} required disabled={cadastrosLoading || condutoresSistema.length === 0}>
         <option value="">{cadastrosLoading ? "Carregando condutores..." : "Ainda não identificado"}</option>
         {form[campo] && !condutoresSistema.some((d) => d.__nome === form[campo]) && <option value={form[campo]}>{form[campo]} — não localizado no cadastro</option>}
-        {condutoresSistema.map((d) => <option key={d.__id} value={d.__nome}>{d.__nome}{d.__matricula ? ` · ${d.__matricula}` : ""}</option>)}
+        {condutoresSistema.map((d) => <option key={d.__id} value={d.__matricula || d.__cpf}>{d.__nome}{d.__matricula ? ` · Matrícula ${d.__matricula}` : ` · CPF ${d.__cpf}`}</option>)}
       </select> : tipo === "select" ? <select value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} required={!!obrigatorio}>
         <option value="">Selecione...</option>{opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
       </select> : tipo === "textarea" ? <textarea rows={3} value={form[campo] ?? ""} onChange={(e) => onChange(campo, e.target.value)} /> :
