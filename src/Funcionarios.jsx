@@ -105,6 +105,7 @@ const CAMPOS_TABELA = [
   "Municipio de Trabalho",
   "Sit. Folha",
 ];
+const MAX_LINHAS_RENDERIZADAS = 100;
 
 /**
  * Trata o cabeçalho duplicado "Nome" (aparece 2x no arquivo original).
@@ -315,7 +316,7 @@ export default function Funcionarios() {
                     </td>
                   </tr>
                 )}
-                {listaFiltrada.map((f) => {
+                {listaFiltrada.slice(0, MAX_LINHAS_RENDERIZADAS).map((f) => {
                   const idxReal = funcionarios.indexOf(f);
                   return (
                     <tr key={idxReal} className="border-t">
@@ -344,6 +345,11 @@ export default function Funcionarios() {
               </tbody>
             </table>
           </div>
+          {listaFiltrada.length > MAX_LINHAS_RENDERIZADAS && (
+            <p className="mt-2 text-xs text-muted">
+              Mostrando os primeiros {MAX_LINHAS_RENDERIZADAS} de {listaFiltrada.length.toLocaleString("pt-BR")} registros. Use a busca para localizar outros funcionários.
+            </p>
+          )}
         </section>
       )}
 
