@@ -93,21 +93,6 @@ const CAMPOS_FUNCIONARIO = [
   "Cod.Unico",
 ];
 
-/** campos exibidos na tabela por padrão */
-const CAMPOS_TABELA = [
-  "Matricula",
-  "Nome",
-  "Status",
-  "Data Admissao",
-  "Funcao Descricao",
-  "Nome Departamento",
-  "Gestor",
-  "CPF",
-  "Municipio de Trabalho",
-  "Sit. Folha",
-];
-const MAX_LINHAS_RENDERIZADAS = 100;
-
 /**
  * Trata o cabeçalho duplicado "Nome" (aparece 2x no arquivo original).
  * Na importação, o segundo "Nome" é remapeado para "Nome_2",
