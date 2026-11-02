@@ -91,6 +91,8 @@ const CAMPOS_FUNCIONARIO = [
   "Cat. Func.",
   "Cat. eSocial",
   "Cod.Unico",
+  "Possui iButton",
+  "Status Termo",
 ];
 
 /**
@@ -160,6 +162,9 @@ export default function Funcionarios() {
   const [cursores, setCursores] = useState([null]);
   const [ultimoDoc, setUltimoDoc] = useState(null);
   const [temProxima, setTemProxima] = useState(false);
+  const [filtros, setFiltros] = useState({ status: "", ibutton: "", termo: "" });
+  const [resultadoFiltro, setResultadoFiltro] = useState(null);
+  const [funcionarioDetalhe, setFuncionarioDetalhe] = useState(null);
   const fileRef = useRef(null);
   const TAMANHO_PAGINA = 50;
 
@@ -225,7 +230,55 @@ export default function Funcionarios() {
     setBuscaAplicada(termo);
     setPagina(0);
     setCursores([null]);
-    void carregarPagina(null, termo);
+    if (Object.values(filtros).some(Boolean)) void aplicarFiltros(filtros, termo);
+    else { setResultadoFiltro(null); void carregarPagina(null, termo); }
+  }
+
+  const normalizarTexto = (valor) => String(valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const campoAlternativo = (row, nomes) => nomes.map((nome) => row?.[nome]).find((v) => v !== undefined && v !== null && String(v).trim() !== "") ?? "";
+  const possuiIbutton = (row) => ["sim", "s", "true", "1", "possui"].includes(normalizarTexto(campoAlternativo(row, ["Possui iButton", "Possui Ibutton", "iButton", "Ibutton", "IBUTTON"])));
+  const statusTermo = (row) => {
+    const v = normalizarTexto(campoAlternativo(row, ["Status Termo", "Status do Termo", "Termo", "Situação Termo", "Situacao Termo"]));
+    if (/(assinado|concluido|finalizado)/.test(v)) return "assinado";
+    if (/(pendente|aguardando|nao assinado|em aberto)/.test(v)) return "pendente";
+    return "sem-status";
+  };
+  const statusFuncionario = (row) => {
+    const v = normalizarTexto(row?.Status);
+    if (/(inativ|desativ|demitid|desligad|rescindid)/.test(v) || /nao ativo/.test(v)) return "inativo";
+    if (/(^|\s)(ativo|ativa|regular|em andamento)(\s|$)/.test(v)) return "ativo";
+    return "outro";
+  };
+  async function aplicarFiltros(novos = filtros, termo = buscaAplicada) {
+    setCarregando(true); setErroCarga("");
+    try {
+      const snap = await getDocs(collection(db, "funcionarios"));
+      const q = normalizarTexto(termo);
+      const filtrados = snap.docs.map((item) => ({ __docId: item.id, ...normalizarDadosFirestore(item.data()) })).filter((row) => {
+        if (novos.status && statusFuncionario(row) !== novos.status) return false;
+        if (novos.ibutton === "sim" && !possuiIbutton(row)) return false;
+        if (novos.ibutton === "nao" && possuiIbutton(row)) return false;
+        if (novos.termo && statusTermo(row) !== novos.termo) return false;
+        return !q || [row.Nome, row.Matricula, row.CPF].some((v) => normalizarTexto(v).includes(q));
+      });
+      setResultadoFiltro(filtrados); setPagina(0); setCursores([null]);
+      setFuncionarios(filtrados.slice(0, TAMANHO_PAGINA));
+      setTemProxima(filtrados.length > TAMANHO_PAGINA); setUltimoDoc(null); setTotal(filtrados.length);
+    } catch (error) {
+      console.error("Erro ao filtrar funcionários:", error);
+      setErroCarga("Não foi possível aplicar os filtros. Tente novamente.");
+    } finally { setCarregando(false); }
+  }
+  function alterarFiltro(campo, valor) {
+    const novos = { ...filtros, [campo]: valor };
+    setFiltros(novos);
+    if (Object.values(novos).some(Boolean)) void aplicarFiltros(novos);
+    else { setResultadoFiltro(null); setTotal(null); setPagina(0); setCursores([null]); void carregarPagina(null, buscaAplicada); }
+  }
+  function paginaFiltro(direcao) {
+    if (!Array.isArray(resultadoFiltro)) return;
+    const nova = Math.max(0, Math.min(Math.ceil(resultadoFiltro.length / TAMANHO_PAGINA) - 1, pagina + direcao));
+    setPagina(nova); setFuncionarios(resultadoFiltro.slice(nova * TAMANHO_PAGINA, (nova + 1) * TAMANHO_PAGINA));
   }
 
   function proximaPagina() {
@@ -403,7 +456,7 @@ export default function Funcionarios() {
 
       {aba === "lista" && (
         <section>
-          <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <div className="flex flex-col sm:flex-row gap-2 mb-3">
             <input
               placeholder="Pesquisar por nome, matrícula ou CPF (início do texto)"
               value={busca}
@@ -415,6 +468,12 @@ export default function Funcionarios() {
             <button onClick={() => { setBusca(""); setBuscaAplicada(""); setPagina(0); setCursores([null]); void carregarPagina(null, ""); }} className="px-3 py-2 text-sm border rounded-md bg-white hover:bg-surface">Limpar busca</button>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4 rounded-xl border bg-white p-3">
+            <label className="text-xs font-medium">Situação do funcionário<select value={filtros.status} onChange={(e) => alterarFiltro("status", e.target.value)} className="mt-1 w-full rounded-md border px-2 py-2 text-sm"><option value="">Todos</option><option value="ativo">Ativos</option><option value="inativo">Inativos</option></select></label>
+            <label className="text-xs font-medium">Possui iButton?<select value={filtros.ibutton} onChange={(e) => alterarFiltro("ibutton", e.target.value)} className="mt-1 w-full rounded-md border px-2 py-2 text-sm"><option value="">Todos</option><option value="sim">Sim</option><option value="nao">Não</option></select></label>
+            <label className="text-xs font-medium">Situação do termo<select value={filtros.termo} onChange={(e) => alterarFiltro("termo", e.target.value)} className="mt-1 w-full rounded-md border px-2 py-2 text-sm"><option value="">Todos</option><option value="pendente">Pendentes</option><option value="assinado">Assinados</option></select></label>
+          </div>
+          {Object.values(filtros).some(Boolean) && <p className="mb-3 text-xs text-muted">Filtros aplicados em toda a base de funcionários.</p>}
           {erroCarga && <p className="text-sm text-red-600 mb-3">{erroCarga}</p>}
           {carregando && <p className="text-sm text-muted mb-3">Carregando funcionários...</p>}
           {!carregando && !erroCarga && funcionarios.length === 0 && (
@@ -440,6 +499,7 @@ export default function Funcionarios() {
                   <div><dt className="text-muted">Município</dt><dd className="font-medium break-words">{exibirValor(f["Municipio de Trabalho"])}</dd></div>
                 </dl>
                 <div className="flex gap-3 border-t mt-4 pt-3 text-sm">
+                  <button onClick={() => setFuncionarioDetalhe(f)} className="text-brand-700 hover:underline">Ver mais informações</button>
                   <button onClick={() => editar(f)} className="text-brand-700 hover:underline">Editar</button>
                   <button onClick={() => excluir(f)} className="text-red-600 hover:underline">Excluir</button>
                 </div>
@@ -453,7 +513,9 @@ export default function Funcionarios() {
                 ? `Resultados desta pesquisa: ${funcionarios.length} (limite de ${TAMANHO_PAGINA})`
                 : `Página ${pagina + 1}${totalPaginas ? ` de ${totalPaginas}` : ""} · ${funcionarios.length} funcionário(s) carregado(s)`}
             </p>
-            {!buscaAplicada.trim() && (
+            {Array.isArray(resultadoFiltro) ? (
+              <div className="flex gap-2"><button disabled={pagina === 0 || carregando} onClick={() => paginaFiltro(-1)} className="px-3 py-2 text-sm border rounded-md disabled:opacity-40">Anterior</button><button disabled={!temProxima || carregando} onClick={() => paginaFiltro(1)} className="px-3 py-2 text-sm border rounded-md disabled:opacity-40">Próxima</button></div>
+            ) : !buscaAplicada.trim() && (
               <div className="flex gap-2">
                 <button disabled={pagina === 0 || carregando} onClick={paginaAnterior} className="px-3 py-2 text-sm border rounded-md disabled:opacity-40">Anterior</button>
                 <button disabled={!ultimoDoc || !temProxima || carregando} onClick={proximaPagina} className="px-3 py-2 text-sm border rounded-md disabled:opacity-40">Próxima</button>
@@ -461,6 +523,19 @@ export default function Funcionarios() {
             )}
           </div>
         </section>
+      )}
+
+      {funcionarioDetalhe && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3" role="dialog" aria-modal="true" aria-label="Informações do funcionário" onClick={(e) => { if (e.target === e.currentTarget) setFuncionarioDetalhe(null); }}>
+          <section className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">{exibirValor(funcionarioDetalhe.Nome)}</h2><p className="text-xs text-muted">Matrícula: {exibirValor(funcionarioDetalhe.Matricula)}</p></div><button onClick={() => setFuncionarioDetalhe(null)} className="rounded-md border px-3 py-1.5 text-sm">Fechar</button></div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{CAMPOS_FUNCIONARIO.map((campo, i) => <div key={campo + i} className="min-w-0 rounded-lg border bg-surface/40 p-3"><p className="text-xs text-muted">{campo}</p><p className="mt-1 break-words text-sm font-medium">{exibirValor(funcionarioDetalhe[campo])}</p></div>)}</div>
+            <div className="mt-5 rounded-xl border p-4"><h3 className="mb-3 text-sm font-semibold">Anexos do funcionário</h3>
+              {Array.isArray(funcionarioDetalhe.Anexos) && funcionarioDetalhe.Anexos.length ? <ul className="space-y-2">{funcionarioDetalhe.Anexos.map((anexo, i) => <li key={anexo.caminho || anexo.url || i} className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 text-sm"><span className="min-w-0 break-all">{anexo.nome || "Anexo"}</span><a href={anexo.url} target="_blank" rel="noreferrer" download className="rounded-md border px-3 py-1.5 text-xs text-brand-700">Baixar / abrir</a></li>)}</ul> : <p className="text-xs text-muted">Nenhum anexo cadastrado.</p>}
+            </div>
+            <div className="mt-4 flex justify-end"><button onClick={() => { const f = funcionarioDetalhe; setFuncionarioDetalhe(null); editar(f); }} className="rounded-md bg-brand-600 px-3 py-2 text-sm text-white">Editar cadastro e anexos</button></div>
+          </section>
+        </div>
       )}
 
       {aba === "form" && (
