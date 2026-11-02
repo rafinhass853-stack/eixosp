@@ -134,6 +134,12 @@ export default function Multas() {
     if (!form["Condutor identificado"] || !condutoresSistema.some((d) => d.__nome === String(form["Condutor identificado"]) && ((form["Matrícula do condutor"] && d.__matricula === String(form["Matrícula do condutor"])) || (form["CPF do condutor"] && d.__cpf === String(form["CPF do condutor"]))))) {
       setErro("Selecione um condutor cadastrado no menu Condutores (NextFleet), com matrícula ou CPF identificado."); return;
     }
+    if (form["Etapa atual"] === "Enviado ao RH" && !form["Data de recebimento do termo assinado"]) {
+      setErro("Antes de encerrar no RH, informe a data de recebimento do termo assinado."); return;
+    }
+    if (form["Etapa atual"] === "Enviado ao RH" && !(Array.isArray(form.Anexos) && form.Anexos.length) && !arquivos.length) {
+      setErro("Antes de encerrar no RH, anexe o termo assinado ou a documentação de encaminhamento."); return;
+    }
     const duplicado = registros.findIndex((r, i) => i !== editIndex && (
       (form.AIT && String(r.AIT || "").trim().toLowerCase() === String(form.AIT).trim().toLowerCase()) ||
       (form["ID interno"] && String(r["ID interno"] || "").trim().toLowerCase() === String(form["ID interno"]).trim().toLowerCase())
