@@ -148,9 +148,6 @@ export default function Cobli() {
         if (novos.length !== importados.length) setErroImport(`Importação: ${novos.length} registro(s) novo(s); ${importados.length - novos.length} duplicado(s) ignorado(s). Nenhum cadastro existente foi sobrescrito.`);
         return [...atual, ...novos];
       });
-        if (novos.length !== importados.length) setErroImport(`Importação: ${novos.length} registro(s) novo(s); ${importados.length - novos.length} duplicado(s) ignorado(s). Nenhum cadastro existente foi sobrescrito.`);
-        return [...atual, ...novos];
-      });
       setAba("lista");
     } catch (err) {
       console.error(err);
