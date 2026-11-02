@@ -1,4 +1,4 @@
-name: Build and deploy Eixo SP to Firebase Hosting
+name: Build and deploy Eixo SP to Firebase
 
 on:
   push:
@@ -22,13 +22,37 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         run: npm ci
 
       - name: Build production bundle
         run: npm run build
 
-      - name: Deploy to Firebase Hosting
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools
+
+      - name: Install Cloud Functions dependencies
+        working-directory: functions
+        run: npm install --omit=dev
+
+      - name: Deploy validation backend first
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EIXOSP }}
+        run: |
+          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON" || (echo "Missing Firebase service account secret" && exit 1)
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-service-account.json"
+          firebase deploy --only functions:validarMatricula --project eixospmultas --non-interactive
+
+      - name: Apply fail-closed Firestore rules
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EIXOSP }}
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-service-account.json"
+          firebase deploy --only firestore:rules --project eixospmultas --non-interactive
+
+      - name: Deploy Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
