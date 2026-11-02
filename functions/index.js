@@ -8,7 +8,7 @@ const db = getFirestore();
 const normalizar = (valor) => String(valor ?? "").trim().replace(/^0+(?=\d)/, "");
 
 exports.validarMatricula = onCall(
-  { maxInstances: 10, enforceAppCheck: false },
+  { region: "southamerica-east1", maxInstances: 10, enforceAppCheck: false },
   async (request) => {
     const matricula = normalizar(request.data?.matricula);
     if (!/^\d{1,20}$/.test(matricula)) {
