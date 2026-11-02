@@ -37,7 +37,7 @@ const GRUPOS = [
     ["Observação do gestor", "textarea"],
   ]},
   { titulo: "Termo e indicação", ajuda: "Controle as datas do termo, assinatura e indicação.", campos: [
-    ["Data de envio do termo", "datetime-local"], ["Data de recebimento do termo assinado", "datetime-local"],
+    ["Destinatário da indicação (locadora/órgão)", "text"], ["Data de envio do termo", "datetime-local"], ["Data de recebimento do termo assinado", "datetime-local"],
     ["Assinatura conferida por", "text"], ["Data da indicação do condutor", "date"],
     ["Protocolo da indicação", "text"], ["Data de validação da indicação", "date"],
     ["Resultado da validação", "select", false, ["Pendente", "Validada", "Rejeitada", "Não se aplica"]],
@@ -93,7 +93,7 @@ export default function Multas() {
           .map((r) => ({ ...r, __nome: fieldValue(r, ["nome", "Nome", "Condutor"]), __matricula: fieldValue(r, ["matricula", "Matrícula", "Matricula"]), __cpf: fieldValue(r, ["cpf", "CPF"]) }))
           .filter((r) => r.__nome && (r.__matricula || r.__cpf)));
         setVeiculosSistema(veicSnap.docs.map((d) => ({ __id: d.id, ...d.data() }))
-          .map((r) => ({ ...r, __placa: fieldValue(r, ["Placa", "placa"]), __frota: fieldValue(r, ["Nº Frota", "Numero da frota", "Número da frota", "Frota"]), __modelo: fieldValue(r, ["Modelo Completo", "Modelo", "Modelo do veículo"]), __propriedade: fieldValue(r, ["Propriedade", "Propriedade / locadora"]) }))
+          .map((r) => ({ ...r, __placa: fieldValue(r, ["Placa", "placa"]), __frota: fieldValue(r, ["Nº Frota", "Numero da frota", "Número da frota", "Frota"]), __modelo: fieldValue(r, ["Modelo Completo", "Modelo", "Modelo do veículo"]), __propriedade: fieldValue(r, ["Propriedade", "Propriedade / locadora", "Locadora"]) }))
           .filter((r) => r.__placa));
       })
       .catch((err) => {
@@ -211,7 +211,7 @@ export default function Multas() {
       {campo === "Placa" ? <select value={form[campo] ?? ""} onChange={(e) => {
         const placa = e.target.value;
         const veiculo = veiculosSistema.find((v) => v.__placa === placa);
-        setForm((f) => ({ ...f, "Placa": placa, "Número da frota": veiculo?.__frota || "", "Modelo do veículo": veiculo?.__modelo || "", "Propriedade / locadora": veiculo?.__propriedade || "" }));
+        setForm((f) => ({ ...f, "Placa": placa, "Número da frota": veiculo?.__frota || "", "Modelo do veículo": veiculo?.__modelo || "", "Propriedade / locadora": veiculo?.__propriedade || "", "Destinatário da indicação (locadora/órgão)": f["Destinatário da indicação (locadora/órgão)"] || veiculo?.__propriedade || "" }));
       }} required disabled={cadastrosLoading || veiculosSistema.length === 0}>
         <option value="">{cadastrosLoading ? "Carregando veículos..." : veiculosSistema.length ? "Selecione um veículo cadastrado..." : "Nenhum veículo cadastrado"}</option>
         {form[campo] && !veiculosSistema.some((v) => v.__placa === form[campo]) && <option value={form[campo]}>{form[campo]} — não localizado no cadastro</option>}
