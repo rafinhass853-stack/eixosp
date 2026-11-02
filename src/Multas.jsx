@@ -69,7 +69,9 @@ const fieldValue = (row, names) => {
 const slug = (s) => String(s || "arquivo").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 90);
 
 export default function Multas() {
-  const [registros, setRegistros, removeRegistro] = useFirestoreCollection("multas", (r) => r["AIT"] || r["ID interno"] || r.id);\n  const [condutores] = useFirestoreCollection("condutores", (r) => r.cpf || r.matricula || r.nome);\n  const [veiculos] = useFirestoreCollection("veiculos", (r) => r.Placa || r.id);
+  const [registros, setRegistros, removeRegistro] = useFirestoreCollection("multas", (r) => r["AIT"] || r["ID interno"] || r.id);
+  const [condutores] = useFirestoreCollection("condutores", (r) => r.cpf || r.matricula || r.nome);
+  const [veiculos] = useFirestoreCollection("veiculos", (r) => r.Placa || r.id);
   const [form, setForm] = useState(vazio());
   const [editIndex, setEditIndex] = useState(null);
   const [aba, setAba] = useState("lista");
