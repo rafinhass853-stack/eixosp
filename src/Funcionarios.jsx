@@ -241,7 +241,13 @@ export default function Funcionarios() {
 
   const normalizarTexto = (valor) => String(valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const campoAlternativo = (row, nomes) => nomes.map((nome) => row?.[nome]).find((v) => v !== undefined && v !== null && String(v).trim() !== "") ?? "";
-  const possuiIbutton = (row) => ["sim", "s", "true", "1", "possui"].includes(normalizarTexto(campoAlternativo(row, ["Possui iButton", "Possui Ibutton", "iButton", "Ibutton", "IBUTTON"])));
+  const possuiIbutton = (row) => {
+    const valor = normalizarTexto(campoAlternativo(row, ["Possui iButton", "Possui Ibutton", "iButton", "Ibutton", "IBUTTON"]));
+    if (!valor) return null;
+    if (["sim", "s", "true", "1", "possui"].includes(valor)) return true;
+    if (["nao", "n", "false", "0", "nao possui", "sem ibutton"].includes(valor)) return false;
+    return null;
+  };
   const statusTermo = (row) => {
     const v = normalizarTexto(campoAlternativo(row, ["Status Termo", "Status do Termo", "Termo", "Situação Termo", "Situacao Termo"]));
     if (/(assinado|concluido|finalizado)/.test(v)) return "assinado";
@@ -262,7 +268,7 @@ export default function Funcionarios() {
       const filtrados = snap.docs.map((item) => ({ __docId: item.id, ...normalizarDadosFirestore(item.data()) })).filter((row) => {
         if (novos.status && statusFuncionario(row) !== novos.status) return false;
         if (novos.ibutton === "sim" && !possuiIbutton(row)) return false;
-        if (novos.ibutton === "nao" && possuiIbutton(row)) return false;
+        if (novos.ibutton === "nao" && possuiIbutton(row) !== false) return false;
         if (novos.termo && statusTermo(row) !== novos.termo) return false;
         return !q || [row.Nome, row.Matricula, row.CPF].some((v) => normalizarTexto(v).includes(q));
       });
