@@ -112,7 +112,8 @@ export default function Condutores() {
         </nav>
       </header>
 
-      <main className="p-6 max-w-7xl mx-auto">\n        {aba === "lista" && <PainelConferenciaIntegracoes modulo="condutores" />}
+      <main className="p-6 max-w-7xl mx-auto">
+        {aba === "lista" && <PainelConferenciaIntegracoes modulo="condutores" />}
         {aba === 'lista' && (
           <ListaView
             condutores={filtrados}
