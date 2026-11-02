@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import PainelConferenciaIntegracoes from './PainelConferenciaIntegracoes';
+import AnexosCadastro from './AnexosCadastro';
 import {
   CAMPOS, CAMPOS_FORM, GRUPOS_CAMPOS,
   normalizarCPF, limparValor, labelDe, formatarCPF, parseData,
@@ -368,6 +369,8 @@ function NovoView({ onSalvo, notificar }) {
         ))}
       </div>
 
+      <AnexosCadastro collectionName={COL} recordId={form.cpf || form.matricula || form.nome} anexos={form.Anexos || []} onChange={(anexos) => setForm((current) => ({ ...current, Anexos: anexos }))} />
+
       <div className="mt-6 flex gap-3">
         <button
           type="submit"
@@ -659,6 +662,7 @@ function Drawer({ modo, dados, onFechar, onSalvo, notificar }) {
               </div>
             </section>
           ))}
+          {editando && <AnexosCadastro collectionName={COL} recordId={form.cpf || dados.cpf || form.matricula || form.nome} anexos={form.Anexos || dados.Anexos || []} onChange={(anexos) => setForm((current) => ({ ...current, Anexos: anexos }))} />}
         </div>
 
         <footer className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
