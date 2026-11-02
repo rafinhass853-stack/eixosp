@@ -92,7 +92,7 @@ export default function Multas() {
       .then(([condSnap, veicSnap]) => {
         if (!ativo) return;
         setCondutoresSistema(condSnap.docs.map((d) => ({ __id: d.id, ...d.data() }))
-          .map((r) => ({ ...r, __nome: fieldValue(r, ["nome", "Nome", "Condutor"]), __matricula: fieldValue(r, ["matricula", "Matrícula", "Matricula"]) }))
+          .map((r) => ({ ...r, __nome: fieldValue(r, ["nome", "Nome", "Condutor"]), __matricula: fieldValue(r, ["matricula", "Matrícula", "Matricula"]), __cpf: fieldValue(r, ["cpf", "CPF"]) }))
           .filter((r) => r.__nome));
         setVeiculosSistema(veicSnap.docs.map((d) => ({ __id: d.id, ...d.data() }))
           .map((r) => ({ ...r, __placa: fieldValue(r, ["Placa", "placa"]), __frota: fieldValue(r, ["Nº Frota", "Numero da frota", "Número da frota", "Frota"]), __modelo: fieldValue(r, ["Modelo Completo", "Modelo", "Modelo do veículo"]), __propriedade: fieldValue(r, ["Propriedade", "Propriedade / locadora"]) }))
@@ -221,8 +221,8 @@ export default function Multas() {
       </select> : campo === "Condutor identificado" ? <select value={form[campo] ?? ""} onChange={(e) => {
         const nome = e.target.value;
         const condutor = condutoresSistema.find((d) => d.__nome === nome);
-        setForm((f) => ({ ...f, "Condutor identificado": nome, "Matrícula do condutor": condutor?.__matricula || "" }));
-      }} disabled={cadastrosLoading || condutoresSistema.length === 0}>
+        setForm((f) => ({ ...f, "Condutor identificado": nome, "Matrícula do condutor": condutor?.__matricula || "", "CPF do condutor": condutor?.__cpf || "" }));
+      }} required disabled={cadastrosLoading || condutoresSistema.length === 0}>
         <option value="">{cadastrosLoading ? "Carregando condutores..." : "Ainda não identificado"}</option>
         {form[campo] && !condutoresSistema.some((d) => d.__nome === form[campo]) && <option value={form[campo]}>{form[campo]} — não localizado no cadastro</option>}
         {condutoresSistema.map((d) => <option key={d.__id} value={d.__nome}>{d.__nome}{d.__matricula ? ` · ${d.__matricula}` : ""}</option>)}
