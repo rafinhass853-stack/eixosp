@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 
-const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
 const dashboardCache = new Map();
 const MODULOS = {
   condutores: { collection: 'condutores', title: 'Visão dos condutores', description: 'Acompanhe cadastro, habilitação e qualidade dos dados.', icon: '👤', metrics: [['Total cadastrado', 'total'], ['Ativos', 'ativos'], ['CNH a verificar', 'cnh'], ['Dados incompletos', 'incompletos']] },
