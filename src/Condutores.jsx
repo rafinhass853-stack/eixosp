@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import {
   collection, doc, getDoc, getDocs, setDoc, deleteDoc,
-  writeBatch, serverTimestamp, query,
+  writeBatch, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import PainelConferenciaIntegracoes from './PainelConferenciaIntegracoes';
