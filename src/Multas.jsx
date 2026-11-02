@@ -24,11 +24,11 @@ const GRUPOS = [
     ["Número do processo / protocolo", "text"], ["Origem da notificação", "select", false, ["E-mail", "Portal", "Locadora", "Outro"]],
   ]},
   { titulo: "Veículo e operação", ajuda: "Identifique o veículo e o contexto operacional.", campos: [
-    ["Placa", "text", true], ["Número da frota", "text"], ["Modelo do veículo", "text"], ["Propriedade / locadora", "text"],
+    ["Placa", "vehicle-select", true], ["Número da frota", "text"], ["Modelo do veículo", "text"], ["Propriedade / locadora", "text"],
     ["Unidade / base operacional", "text"], ["Tipo de operação", "text"], ["Observações da operação", "textarea"],
   ]},
   { titulo: "Identificação do condutor", ajuda: "A identificação no Cobli continua manual. Registre aqui o resultado da conferência.", campos: [
-    ["Condutor identificado", "text"], ["Matrícula do condutor", "text"], ["Data da identificação", "date"],
+    ["Condutor identificado", "driver-select", true], ["Matrícula do condutor", "text"], ["CPF do condutor", "text"], ["Data da identificação", "date"],
     ["Responsável pela conferência", "text"], ["Evidência / observação Cobli", "textarea"],
     ["Gestor responsável", "text"], ["Data de envio ao gestor", "datetime-local"], ["Data de retorno do gestor", "datetime-local"],
     ["Decisão do gestor", "select", false, ["Aguardando", "Confirmou condutor", "Contestou identificação", "Sem retorno", "Não se aplica"]],
@@ -58,7 +58,7 @@ const fmt = (value) => {
 const slug = (s) => String(s || "arquivo").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 90);
 
 export default function Multas() {
-  const [registros, setRegistros, removeRegistro] = useFirestoreCollection("multas", (r) => r["AIT"] || r["ID interno"] || r.id);
+  const [registros, setRegistros, removeRegistro] = useFirestoreCollection("multas", (r) => r["AIT"] || r["ID interno"] || r.id);\n  const [condutores] = useFirestoreCollection("condutores", (r) => r.cpf || r.matricula || r.nome);\n  const [veiculos] = useFirestoreCollection("veiculos", (r) => r.Placa || r.id);
   const [form, setForm] = useState(vazio());
   const [editIndex, setEditIndex] = useState(null);
   const [aba, setAba] = useState("lista");
