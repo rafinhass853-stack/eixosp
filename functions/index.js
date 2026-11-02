@@ -5,6 +5,8 @@ const { getFirestore } = require("firebase-admin/firestore");
 initializeApp();
 const db = getFirestore();
 
+exports.importFuncionarios = require("./importFuncionarios").importFuncionarios;
+
 const normalizar = (valor) => String(valor ?? "").trim();
 
 exports.validarMatricula = onCall(
