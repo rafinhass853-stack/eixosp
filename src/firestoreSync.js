@@ -71,6 +71,10 @@ export function useFirestoreCollection(collectionName, getId) {
         if (Date.now() - lastSync < CACHE_TTL_MS) {
           try {
             snap = await getDocsFromCache(ref);
+            // Um cache vazio pode significar apenas que esta coleção ainda não
+            // foi materializada neste navegador. Nesse caso, não esconda dados
+            // existentes no servidor: o fallback abaixo faz a leitura remota.
+            if (snap.empty) snap = null;
           } catch {
             // Cache persistente indisponível ou ainda sem dados; consulta o servidor abaixo.
           }
