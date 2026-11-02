@@ -42,7 +42,8 @@ jobs:
           test -n "$FIREBASE_SERVICE_ACCOUNT_JSON" || (echo "Missing Firebase service account secret" && exit 1)
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-service-account.json"
-          firebase functions:delete importFuncionarios --region southamerica-east1 --project eixospmultas --force --non-interactive
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/firebase-service-account.json"
+          gcloud functions delete importFuncionarios --gen2 --region=southamerica-east1 --project=eixospmultas --quiet
 
       - name: Apply fail-closed Firestore rules
         env:
